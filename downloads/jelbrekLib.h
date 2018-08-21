@@ -1,7 +1,7 @@
 
-extern uint32_t kaslr_slide;
-extern uint64_t kernel_base;
-extern mach_port_t tfp0;
+extern uint32_t KASLR_Slide;
+extern uint64_t KernelBase;
+extern mach_port_t TFP0;
 
 /*
  Purpose: Initialize jelbrekLib (first thing you have to call)
@@ -195,10 +195,10 @@ void HexDump(uint64_t addr, size_t size);
     Slid address of function
     Up to 7 arguments
  Return address:
-    Return address of called function (must call zm_fix_addr before using returned pointers)
+    Return address of called function (must call ZmFixAddr before using returned pointers)
  */
-uint64_t kexecute(uint64_t addr, uint64_t x0, uint64_t x1, uint64_t x2, uint64_t x3, uint64_t x4, uint64_t x5, uint64_t x6);
-uint64_t zm_fix_addr(uint64_t addr);
+uint64_t Kernel_Execute(uint64_t addr, uint64_t x0, uint64_t x1, uint64_t x2, uint64_t x3, uint64_t x4, uint64_t x5, uint64_t x6);
+uint64_t ZmFixAddr(uint64_t addr);
 
 /*
  Purpose:
@@ -228,7 +228,7 @@ void unlocknvram(void);
 
 /*
  Purpose:
-    Reock nvram memory. unlocknvmram() must have been used beforehand
+    Relock nvram memory. unlocknvmram() must have been used beforehand
  Return value:
     -1: Error
      0: Success
@@ -241,7 +241,7 @@ int locknvram(void);
  Return value:
     Kernel base?
  */
-uint64_t find_kernel_base(void);
+uint64_t FindKernelBase(void);
 
 /*
  Purpose:
@@ -264,16 +264,85 @@ char *copyBootHash(void);
  Purpose:
     Patchfinding (by xerub & ninjaprawn)
  */
-uint64_t find_allproc(void);
-uint64_t find_add_x0_x0_0x40_ret(void);
-uint64_t find_copyout(void);
-uint64_t find_bzero(void);
-uint64_t find_bcopy(void);
-uint64_t find_rootvnode(void);
-uint64_t find_trustcache(void);
-uint64_t find_amficache(void);
-uint64_t find_OSBoolean_True(void);
-uint64_t find_OSBoolean_False(void);
-uint64_t find_zone_map_ref(void);
-uint64_t find_osunserializexml(void);
-uint64_t find_smalloc(void);
+uint64_t Find_allproc(void);
+uint64_t Find_add_x0_x0_0x40_ret(void);
+uint64_t Find_copyout(void);
+uint64_t Find_bzero(void);
+uint64_t Find_bcopy(void);
+uint64_t Find_rootvnode(void);
+uint64_t Find_trustcache(void);
+uint64_t Find_amficache(void);
+uint64_t Find_OSBoolean_True(void);
+uint64_t Find_OSBoolean_False(void);
+uint64_t Find_zone_map_ref(void);
+uint64_t Find_osunserializexml(void);
+uint64_t Find_smalloc(void);
+
+/*
+ Purpose:
+    Internal utilities
+ */
+uint64_t TaskSelfAddr(void);
+uint64_t IPCSpaceKernel(void);
+uint64_t FindPortAddress(mach_port_name_t port);
+mach_port_t FakeHostPriv(void);
+void convertPortToTaskPort(mach_port_t port, uint64_t space, uint64_t task_kaddr);
+void MakePortFakeTaskPort(mach_port_t port, uint64_t task_kaddr);
+
+/*
+ Purpose:
+    For reading & writing & copying & allocating & freeing kernel memory
+ */
+size_t KernelRead(uint64_t where, void *p, size_t size);
+uint32_t KernelRead_32bits(uint64_t where);
+uint64_t KernelRead_64bits(uint64_t where);
+
+size_t kwrite(uint64_t where, const void *p, size_t size);
+void KernelWrite_32bits(uint64_t where, uint32_t what);
+void KernelWrite_64bits(uint64_t where, uint64_t what);
+void Kernel_memcpy(uint64_t dest, uint64_t src, uint32_t length);
+
+void Kernel_free(mach_vm_address_t address, vm_size_t size);
+uint64_t Kernel_alloc(vm_size_t size);
+uint64_t Kernel_alloc_wired(uint64_t size);
+
+/*
+ Purpose:
+    Find proc struct on kernel
+ Parameters:
+    Process ID
+ Return values:
+    Kernel pointer to proc struct
+ */
+uint64_t proc_of_pid(pid_t pid);
+/*
+ Purpose:
+    Find proc struct on kernel
+ Parameters:
+    Process name
+ Return values:
+    Kernel pointer to proc struct
+ */
+uint64_t proc_of_procName(char *nm);
+
+/*
+ Purpose:
+    Find pid of process
+ Parameters:
+    Process name
+ Return values:
+    Process ID of process
+ */
+unsigned int pid_of_procName(char *nm);
+
+/*
+ Purpose:
+    Inject dylib on process
+ Parameters:
+    Process ID
+    Path to dylib
+ Return values:
+    -1: Error
+     0: Success
+ */
+int inject_dylib(pid_t pid, char *loaded_dylib);

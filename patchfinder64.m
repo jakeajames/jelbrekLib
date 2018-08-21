@@ -212,7 +212,7 @@ step64(const uint8_t *buf, addr_t start, size_t length, uint32_t what, uint32_t 
     return 0;
 }
 
-// str8 = step64_back(kernel, ref, ref - bof, INSN_STR8);
+// str8 = step64_back(Kernel, ref, ref - bof, INSN_STR8);
 static addr_t
 step64_back(const uint8_t *buf, addr_t start, size_t length, uint32_t what, uint32_t mask)
 {
@@ -393,13 +393,13 @@ calc64mov(const uint8_t *buf, addr_t start, addr_t end, int which)
 }
 
 static addr_t
-find_call64(const uint8_t *buf, addr_t start, size_t length)
+Find_call64(const uint8_t *buf, addr_t start, size_t length)
 {
     return step64(buf, start, length, 0x94000000, 0xFC000000);
 }
 
 static addr_t
-follow_call64(const uint8_t *buf, addr_t call)
+Follow_call64(const uint8_t *buf, addr_t call)
 {
     long long w;
     w = *(uint32_t *)(buf + call) & 0x3FFFFFF;
@@ -409,12 +409,12 @@ follow_call64(const uint8_t *buf, addr_t call)
 }
 
 static addr_t
-follow_cbz(const uint8_t *buf, addr_t cbz)
+Follow_cbz(const uint8_t *buf, addr_t cbz)
 {
     return cbz + ((*(int *)(buf + cbz) & 0x3FFFFE0) << 10 >> 13);
 }
 
-/* kernel iOS10 **************************************************************/
+/* Kernel iOS10 **************************************************************/
 
 #import <fcntl.h>
 #import <stdio.h>
@@ -426,27 +426,27 @@ follow_cbz(const uint8_t *buf, addr_t cbz)
 
 #ifdef __ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__
 #import <mach/mach.h>
-size_t kread(uint64_t where, void *p, size_t size);
+size_t KernelRead(uint64_t where, void *p, size_t size);
 #endif
 
-static uint8_t *kernel = NULL;
-static size_t kernel_size = 0;
+static uint8_t *Kernel = NULL;
+static size_t Kernel_size = 0;
 
-static addr_t xnucore_base = 0;
-static addr_t xnucore_size = 0;
-static addr_t prelink_base = 0;
-static addr_t prelink_size = 0;
-static addr_t cstring_base = 0;
-static addr_t cstring_size = 0;
-static addr_t pstring_base = 0;
-static addr_t pstring_size = 0;
-static addr_t kerndumpbase = -1;
-static addr_t kernel_entry = 0;
-static void *kernel_mh = 0;
-static addr_t kernel_delta = 0;
+static addr_t XNUCore_Base = 0;
+static addr_t XNUCore_size = 0;
+static addr_t Prelink_base = 0;
+static addr_t Prelink_size = 0;
+static addr_t CString_base = 0;
+static addr_t CString_size = 0;
+static addr_t PString_base = 0;
+static addr_t PString_size = 0;
+static addr_t KernDumpBase = -1;
+static addr_t Kernel_entry = 0;
+static void *Kernel_mh = 0;
+static addr_t Kernel_delta = 0;
 
 int
-init_kernel(addr_t base, const char *filename)
+InitPatchfinder(addr_t base, const char *filename)
 {
     size_t rv;
     uint8_t buf[0x4000];
@@ -459,7 +459,7 @@ init_kernel(addr_t base, const char *filename)
     
 #ifdef __ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__
 #define close(f)
-    rv = kread(base, buf, sizeof(buf));
+    rv = KernelRead(base, buf, sizeof(buf));
     if (rv != sizeof(buf)) {
         return -1;
     }
@@ -497,19 +497,19 @@ init_kernel(addr_t base, const char *filename)
                 max = seg->vmaddr + seg->vmsize;
             }
             if (!strcmp(seg->segname, "__TEXT_EXEC")) {
-                xnucore_base = seg->vmaddr;
-                xnucore_size = seg->filesize;
+                XNUCore_Base = seg->vmaddr;
+                XNUCore_size = seg->filesize;
             }
             if (!strcmp(seg->segname, "__PLK_TEXT_EXEC")) {
-                prelink_base = seg->vmaddr;
-                prelink_size = seg->filesize;
+                Prelink_base = seg->vmaddr;
+                Prelink_size = seg->filesize;
             }
             if (!strcmp(seg->segname, "__TEXT")) {
                 const struct section_64 *sec = (struct section_64 *)(seg + 1);
                 for (j = 0; j < seg->nsects; j++) {
-                    if (!strcmp(sec[j].sectname, "__cstring")) {
-                        cstring_base = sec[j].addr;
-                        cstring_size = sec[j].size;
+                    if (!strcmp(sec[j].sectname, "__CString")) {
+                        CString_base = sec[j].addr;
+                        CString_size = sec[j].size;
                     }
                 }
             }
@@ -517,13 +517,13 @@ init_kernel(addr_t base, const char *filename)
                 const struct section_64 *sec = (struct section_64 *)(seg + 1);
                 for (j = 0; j < seg->nsects; j++) {
                     if (!strcmp(sec[j].sectname, "__text")) {
-                        pstring_base = sec[j].addr;
-                        pstring_size = sec[j].size;
+                        PString_base = sec[j].addr;
+                        PString_size = sec[j].size;
                     }
                 }
             }
             if (!strcmp(seg->segname, "__LINKEDIT")) {
-                kernel_delta = seg->vmaddr - min - seg->fileoff;
+                Kernel_delta = seg->vmaddr - min - seg->fileoff;
             }
         }
         if (cmd->cmd == LC_UNIXTHREAD) {
@@ -538,37 +538,37 @@ init_kernel(addr_t base, const char *filename)
                 uint32_t cpsr;    /* Current program status register */
             } *thread = (void *)(ptr + 2);
             if (flavor == 6) {
-                kernel_entry = thread->pc;
+                Kernel_entry = thread->pc;
             }
         }
         q = q + cmd->cmdsize;
     }
     
-    kerndumpbase = min;
-    xnucore_base -= kerndumpbase;
-    prelink_base -= kerndumpbase;
-    cstring_base -= kerndumpbase;
-    pstring_base -= kerndumpbase;
-    kernel_size = max - min;
+    KernDumpBase = min;
+    XNUCore_Base -= KernDumpBase;
+    Prelink_base -= KernDumpBase;
+    CString_base -= KernDumpBase;
+    PString_base -= KernDumpBase;
+    Kernel_size = max - min;
     
 #ifdef __ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__
-    kernel = malloc(kernel_size);
-    if (!kernel) {
+    Kernel = malloc(Kernel_size);
+    if (!Kernel) {
         return -1;
     }
-    rv = kread(kerndumpbase, kernel, kernel_size);
-    if (rv != kernel_size) {
-        free(kernel);
+    rv = KernelRead(KernDumpBase, Kernel, Kernel_size);
+    if (rv != Kernel_size) {
+        free(Kernel);
         return -1;
     }
     
-    kernel_mh = kernel + base - min;
+    Kernel_mh = Kernel + base - min;
     
     (void)filename;
 #undef close
 #else    /* __ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__ */
-    kernel = calloc(1, kernel_size);
-    if (!kernel) {
+    Kernel = calloc(1, Kernel_size);
+    if (!Kernel) {
         close(fd);
         return -1;
     }
@@ -578,18 +578,18 @@ init_kernel(addr_t base, const char *filename)
         const struct load_command *cmd = (struct load_command *)q;
         if (cmd->cmd == LC_SEGMENT_64) {
             const struct segment_command_64 *seg = (struct segment_command_64 *)q;
-            size_t sz = pread(fd, kernel + seg->vmaddr - min, seg->filesize, seg->fileoff);
+            size_t sz = pread(fd, Kernel + seg->vmaddr - min, seg->filesize, seg->fileoff);
             if (sz != seg->filesize) {
                 close(fd);
-                free(kernel);
+                free(Kernel);
                 return -1;
             }
-            if (!kernel_mh) {
-                kernel_mh = kernel + seg->vmaddr - min;
+            if (!Kernel_mh) {
+                Kernel_mh = Kernel + seg->vmaddr - min;
             }
             printf("%s\n", seg->segname);
             if (!strcmp(seg->segname, "__LINKEDIT")) {
-                kernel_delta = seg->vmaddr - min - seg->fileoff;
+                Kernel_delta = seg->vmaddr - min - seg->fileoff;
             }
         }
         q = q + cmd->cmdsize;
@@ -603,9 +603,9 @@ init_kernel(addr_t base, const char *filename)
 }
 
 void
-term_kernel(void)
+TermPatchfinder(void)
 {
-    free(kernel);
+    free(Kernel);
 }
 
 /* these operate on VA ******************************************************/
@@ -617,100 +617,100 @@ term_kernel(void)
 #define INSN_ADRP 0x90000000, 0x9F000000
 
 addr_t
-find_register_value(addr_t where, int reg)
+Find_register_value(addr_t where, int reg)
 {
     addr_t val;
     addr_t bof = 0;
-    where -= kerndumpbase;
-    if (where > xnucore_base) {
-        bof = bof64(kernel, xnucore_base, where);
+    where -= KernDumpBase;
+    if (where > XNUCore_Base) {
+        bof = bof64(Kernel, XNUCore_Base, where);
         if (!bof) {
-            bof = xnucore_base;
+            bof = XNUCore_Base;
         }
-    } else if (where > prelink_base) {
-        bof = bof64(kernel, prelink_base, where);
+    } else if (where > Prelink_base) {
+        bof = bof64(Kernel, Prelink_base, where);
         if (!bof) {
-            bof = prelink_base;
+            bof = Prelink_base;
         }
     }
-    val = calc64(kernel, bof, where, reg);
+    val = calc64(Kernel, bof, where, reg);
     if (!val) {
         return 0;
     }
-    return val + kerndumpbase;
+    return val + KernDumpBase;
 }
 
 addr_t
-find_reference(addr_t to, int n, int prelink)
+Find_reference(addr_t to, int n, int Prelink)
 {
     addr_t ref, end;
-    addr_t base = xnucore_base;
-    addr_t size = xnucore_size;
-    if (prelink) {
-        base = prelink_base;
-        size = prelink_size;
+    addr_t base = XNUCore_Base;
+    addr_t size = XNUCore_size;
+    if (Prelink) {
+        base = Prelink_base;
+        size = Prelink_size;
     }
     if (n <= 0) {
         n = 1;
     }
     end = base + size;
-    to -= kerndumpbase;
+    to -= KernDumpBase;
     do {
-        ref = xref64(kernel, base, end, to);
+        ref = xref64(Kernel, base, end, to);
         if (!ref) {
             return 0;
         }
         base = ref + 4;
     } while (--n > 0);
-    return ref + kerndumpbase;
+    return ref + KernDumpBase;
 }
 
 addr_t
-find_strref(const char *string, int n, int prelink)
+Find_strref(const char *string, int n, int Prelink)
 {
     uint8_t *str;
-    addr_t base = cstring_base;
-    addr_t size = cstring_size;
-    if (prelink) {
-        base = pstring_base;
-        size = pstring_size;
+    addr_t base = CString_base;
+    addr_t size = CString_size;
+    if (Prelink) {
+        base = PString_base;
+        size = PString_size;
     }
-    str = boyermoore_horspool_memmem(kernel + base, size, (uint8_t *)string, strlen(string));
+    str = boyermoore_horspool_memmem(Kernel + base, size, (uint8_t *)string, strlen(string));
     if (!str) {
         return 0;
     }
-    return find_reference(str - kernel + kerndumpbase, n, prelink);
+    return Find_reference(str - Kernel + KernDumpBase, n, Prelink);
 }
 
 /****** fun *******/
 
-addr_t find_add_x0_x0_0x40_ret(void) {
+addr_t Find_add_x0_x0_0x40_ret(void) {
     addr_t off;
     uint32_t *k;
-    k = (uint32_t *)(kernel + xnucore_base);
-    for (off = 0; off < xnucore_size - 4; off += 4, k++) {
+    k = (uint32_t *)(Kernel + XNUCore_Base);
+    for (off = 0; off < XNUCore_size - 4; off += 4, k++) {
         if (k[0] == 0x91010000 && k[1] == 0xD65F03C0) {
-            return off + xnucore_base + kerndumpbase;
+            return off + XNUCore_Base + KernDumpBase;
         }
     }
-    k = (uint32_t *)(kernel + prelink_base);
-    for (off = 0; off < prelink_size - 4; off += 4, k++) {
+    k = (uint32_t *)(Kernel + Prelink_base);
+    for (off = 0; off < Prelink_size - 4; off += 4, k++) {
         if (k[0] == 0x91010000 && k[1] == 0xD65F03C0) {
-            return off + prelink_base + kerndumpbase;
+            return off + Prelink_base + KernDumpBase;
         }
     }
     return 0;
 }
 
-uint64_t find_allproc(void) {
+uint64_t Find_allproc(void) {
     // Find the first reference to the string
-    addr_t ref = find_strref("\"pgrp_add : pgrp is dead adding process\"", 1, 0);
+    addr_t ref = Find_strref("\"pgrp_add : pgrp is dead adding process\"", 1, 0);
     if (!ref) {
         return 0;
     }
-    ref -= kerndumpbase;
+    ref -= KernDumpBase;
     
-    uint64_t start = bof64(kernel, xnucore_base, ref);
+    uint64_t start = bof64(Kernel, XNUCore_Base, ref);
     if (!start) {
         return 0;
     }
@@ -718,7 +718,7 @@ uint64_t find_allproc(void) {
     // Find AND W8, W8, #0xFFFFDFFF - it's a pretty distinct instruction
     addr_t weird_instruction = 0;
     for (int i = 4; i < 4*0x100; i+=4) {
-        uint32_t op = *(uint32_t *)(kernel + ref + i);
+        uint32_t op = *(uint32_t *)(Kernel + ref + i);
         if (op == 0x12127908) {
             weird_instruction = ref+i;
             break;
@@ -728,26 +728,26 @@ uint64_t find_allproc(void) {
         return 0;
     }
     
-    uint64_t val = calc64(kernel, start, weird_instruction - 8, 8);
+    uint64_t val = calc64(Kernel, start, weird_instruction - 8, 8);
     if (!val) {
         printf("Failed to calculate x8");
         return 0;
     }
     
-    return val + kerndumpbase;
+    return val + KernDumpBase;
 }
 
-uint64_t find_copyout(void) {
+uint64_t Find_copyout(void) {
     // Find the first reference to the string
-    addr_t ref = find_strref("\"%s(%p, %p, %lu) - transfer too large\"", 2, 0);
+    addr_t ref = Find_strref("\"%s(%p, %p, %lu) - transfer too large\"", 2, 0);
     if (!ref) {
         return 0;
     }
-    ref -= kerndumpbase;
+    ref -= KernDumpBase;
     
     uint64_t start = 0;
     for (int i = 4; i < 0x100*4; i+=4) {
-        uint32_t op = *(uint32_t*)(kernel+ref-i);
+        uint32_t op = *(uint32_t*)(Kernel+ref-i);
         if (op == 0xd10143ff) { // SUB SP, SP, #0x50
             start = ref-i;
             break;
@@ -757,58 +757,58 @@ uint64_t find_copyout(void) {
         return 0;
     }
     
-    return start + kerndumpbase;
+    return start + KernDumpBase;
 }
 
-uint64_t find_bzero(void) {
+uint64_t Find_bzero(void) {
     // Just find SYS #3, c7, c4, #1, X3, then get the start of that function
     addr_t off;
     uint32_t *k;
-    k = (uint32_t *)(kernel + xnucore_base);
-    for (off = 0; off < xnucore_size - 4; off += 4, k++) {
+    k = (uint32_t *)(Kernel + XNUCore_Base);
+    for (off = 0; off < XNUCore_size - 4; off += 4, k++) {
         if (k[0] == 0xd50b7423) {
-            off += xnucore_base;
+            off += XNUCore_Base;
             break;
         }
     }
     
-    uint64_t start = bof64(kernel, xnucore_base, off);
+    uint64_t start = bof64(Kernel, XNUCore_Base, off);
     if (!start) {
         return 0;
     }
     
-    return start + kerndumpbase;
+    return start + KernDumpBase;
 }
 
-addr_t find_bcopy(void) {
+addr_t Find_bcopy(void) {
     // Jumps straight into memmove after switching x0 and x1 around
     // Guess we just find the switch and that's it
     addr_t off;
     uint32_t *k;
-    k = (uint32_t *)(kernel + xnucore_base);
-    for (off = 0; off < xnucore_size - 4; off += 4, k++) {
+    k = (uint32_t *)(Kernel + XNUCore_Base);
+    for (off = 0; off < XNUCore_size - 4; off += 4, k++) {
         if (k[0] == 0xAA0003E3 && k[1] == 0xAA0103E0 && k[2] == 0xAA0303E1 && k[3] == 0xd503201F) {
-            return off + xnucore_base + kerndumpbase;
+            return off + XNUCore_Base + KernDumpBase;
         }
     }
-    k = (uint32_t *)(kernel + prelink_base);
-    for (off = 0; off < prelink_size - 4; off += 4, k++) {
+    k = (uint32_t *)(Kernel + Prelink_base);
+    for (off = 0; off < Prelink_size - 4; off += 4, k++) {
         if (k[0] == 0xAA0003E3 && k[1] == 0xAA0103E0 && k[2] == 0xAA0303E1 && k[3] == 0xd503201F) {
-            return off + prelink_base + kerndumpbase;
+            return off + Prelink_base + KernDumpBase;
         }
     }
     return 0;
 }
 
-uint64_t find_rootvnode(void) {
+uint64_t Find_rootvnode(void) {
     // Find the first reference to the string
-    addr_t ref = find_strref("/var/run/.vfs_rsrc_streams_%p%x", 1, 0);
+    addr_t ref = Find_strref("/var/run/.vfs_rsrc_streams_%p%x", 1, 0);
     if (!ref) {
         return 0;
     }
-    ref -= kerndumpbase;
+    ref -= KernDumpBase;
     
-    uint64_t start = bof64(kernel, xnucore_base, ref);
+    uint64_t start = bof64(Kernel, XNUCore_Base, ref);
     if (!start) {
         return 0;
     }
@@ -816,7 +816,7 @@ uint64_t find_rootvnode(void) {
     // Find MOV X9, #0x2000000000 - it's a pretty distinct instruction
     addr_t weird_instruction = 0;
     for (int i = 4; i < 4*0x100; i+=4) {
-        uint32_t op = *(uint32_t *)(kernel + ref - i);
+        uint32_t op = *(uint32_t *)(Kernel + ref - i);
         if (op == 0xB25B03E9) {
             weird_instruction = ref-i;
             break;
@@ -826,75 +826,75 @@ uint64_t find_rootvnode(void) {
         return 0;
     }
     
-    uint64_t val = calc64(kernel, start, weird_instruction, 8);
+    uint64_t val = calc64(Kernel, start, weird_instruction, 8);
     if (!val) {
         return 0;
     }
     
-    return val + kerndumpbase;
+    return val + KernDumpBase;
 }
 
 //reversed from Electra
 //originally made by ninjaprawn
 
-addr_t find_trustcache(void) {
+addr_t Find_trustcache(void) {
     addr_t call, func;
-    addr_t ref = find_strref("%s: only allowed process can check the trust cache", 1, 1);
+    addr_t ref = Find_strref("%s: only allowed process can check the trust cache", 1, 1);
     if (!ref) {
         return 0;
     }
-    ref -= kerndumpbase;
-    call = step64_back(kernel, ref, 44, INSN_CALL);
+    ref -= KernDumpBase;
+    call = step64_back(Kernel, ref, 44, INSN_CALL);
     if (!call) {
         return 0;
     }
-    func = follow_call64(kernel, call);
+    func = Follow_call64(Kernel, call);
     if (!func) {
         return 0;
     }
-    call = step64(kernel, func, 32, INSN_CALL);
+    call = step64(Kernel, func, 32, INSN_CALL);
     if (!call) {
         return 0;
     }
-    func = follow_call64(kernel, call);
+    func = Follow_call64(Kernel, call);
     if (!func) {
         return 0;
     }
-    call = step64(kernel, func, 32, INSN_CALL);
+    call = step64(Kernel, func, 32, INSN_CALL);
     if (!call) {
         return 0;
     }
-    call = step64(kernel, call + 4, 32, INSN_CALL);
+    call = step64(Kernel, call + 4, 32, INSN_CALL);
     if (!call) {
         return 0;
     }
-    func = follow_call64(kernel, call);
+    func = Follow_call64(Kernel, call);
     if (!func) {
         return 0;
     }
-    call = step64(kernel, func, 48, INSN_CALL);
+    call = step64(Kernel, func, 48, INSN_CALL);
     if (!call) {
         return 0;
     }
-    return calc64(kernel, call, call + 24, 21) + kerndumpbase;
+    return calc64(Kernel, call, call + 24, 21) + KernDumpBase;
 }
 
-addr_t find_zone_map_ref(void) {
+addr_t Find_zone_map_ref(void) {
     // \"Nothing being freed to the zone_map. start = end = %p\\n\"
-    uint64_t val = kerndumpbase;
+    uint64_t val = KernDumpBase;
     
-    addr_t ref = find_strref("\"Nothing being freed to the zone_map. start = end = %p\\n\"", 1, 0);
-    ref -= kerndumpbase;
+    addr_t ref = Find_strref("\"Nothing being freed to the zone_map. start = end = %p\\n\"", 1, 0);
+    ref -= KernDumpBase;
     
     // skip add & adrp for panic str
     ref -= 8;
     
     // adrp xX, #_zone_map@PAGE
-    ref = step64_back(kernel, ref, 30, INSN_ADRP);
+    ref = step64_back(Kernel, ref, 30, INSN_ADRP);
     
-    uint32_t *insn = (uint32_t*)(kernel+ref);
+    uint32_t *insn = (uint32_t*)(Kernel+ref);
     // get pc
-    val += ((uint8_t*)(insn) - kernel) & ~0xfff;
+    val += ((uint8_t*)(insn) - Kernel) & ~0xfff;
     uint8_t xm = *insn & 0x1f;
     
     // don't ask, I wrote this at 5am
@@ -916,17 +916,17 @@ addr_t find_zone_map_ref(void) {
     return val;
 }
 
-addr_t find_OSBoolean_True() {
+addr_t Find_OSBoolean_True() {
     addr_t val;
-    addr_t ref = find_strref("Delay Autounload", 0, 0);
+    addr_t ref = Find_strref("Delay Autounload", 0, 0);
     if (!ref) {
         return 0;
     }
-    ref -= kerndumpbase;
+    ref -= KernDumpBase;
     
     addr_t weird_instruction = 0;
     for (int i = 4; i < 4*0x100; i+=4) {
-        uint32_t op = *(uint32_t *)(kernel + ref + i);
+        uint32_t op = *(uint32_t *)(Kernel + ref + i);
         if (op == 0x320003E0) {
             weird_instruction = ref+i;
             break;
@@ -936,27 +936,27 @@ addr_t find_OSBoolean_True() {
         return 0;
     }
     
-    val = calc64(kernel, ref, weird_instruction, 8);
+    val = calc64(Kernel, ref, weird_instruction, 8);
     if (!val) {
         return 0;
     }
     
-    return kread64(val + kerndumpbase);
+    return KernelRead_64bits(val + KernDumpBase);
 }
 
-addr_t find_OSBoolean_False() {
-    return find_OSBoolean_True()+8;
+addr_t Find_OSBoolean_False() {
+    return Find_OSBoolean_True()+8;
 }
-addr_t find_osunserializexml() {
-    addr_t ref = find_strref("OSUnserializeXML: %s near line %d\n", 1, 0);
-    ref -= kerndumpbase;
-    uint64_t start = bof64(kernel, xnucore_base, ref);
-    return start + kerndumpbase;
+addr_t Find_osunserializexml() {
+    addr_t ref = Find_strref("OSUnserializeXML: %s near line %d\n", 1, 0);
+    ref -= KernDumpBase;
+    uint64_t start = bof64(Kernel, XNUCore_Base, ref);
+    return start + KernDumpBase;
 }
 
-addr_t find_smalloc() {
-    addr_t ref = find_strref("sandbox memory allocation failure", 1, 1);
-    ref -= kerndumpbase;
-    uint64_t start = bof64(kernel, prelink_base, ref);
-    return start + kerndumpbase;
+addr_t Find_smalloc() {
+    addr_t ref = Find_strref("sandbox memory allocation failure", 1, 1);
+    ref -= KernDumpBase;
+    uint64_t start = bof64(Kernel, Prelink_base, ref);
+    return start + KernDumpBase;
 }

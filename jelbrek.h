@@ -30,9 +30,9 @@
 //---Obj-c stuff---//
 #import <Foundation/Foundation.h>
 
-extern uint32_t kaslr_slide;
-extern uint64_t kernel_base;
-extern mach_port_t tfp0;
+extern uint32_t KASLR_Slide;
+extern uint64_t KernelBase;
+extern mach_port_t TFP0;
 
 /*
  Purpose: Initialize jelbrekLib (first thing you have to call)

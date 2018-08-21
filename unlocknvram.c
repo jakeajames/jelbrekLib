@@ -39,9 +39,9 @@ uint64_t get_iodtnvram_obj(void) {
     io_service_t IODTNVRAMSrv = IOServiceGetMatchingService(kIOMasterPortDefault, IOServiceMatching("IODTNVRAM"));
     
     // leak user serv
-    uint64_t nvram_up = find_port_address(IODTNVRAMSrv);
+    uint64_t nvram_up = FindPortAddress(IODTNVRAMSrv);
     // get kern obj -- IODTNVRAM*
-    uint64_t IODTNVRAMObj = kread64(nvram_up + offsetof_ip_kobject);
+    uint64_t IODTNVRAMObj = KernelRead_64bits(nvram_up + off_ip_kobject);
     
     return IODTNVRAMObj;
 }
@@ -56,30 +56,30 @@ void unlocknvram(void) {
         return;
     }
     
-    uint64_t vtable_start = kread64(IODTNVRAMObj);
+    uint64_t vtable_start = KernelRead_64bits(IODTNVRAMObj);
     
     orig_vtable = vtable_start;
     
     uint64_t vtable_end = vtable_start;
     // Is vtable really guaranteed to end with 0 or was it just a coincidence?..
     // should we just use some max value instead?
-    while (kread64(vtable_end) != 0) vtable_end += sizeof(uint64_t);
+    while (KernelRead_64bits(vtable_end) != 0) vtable_end += sizeof(uint64_t);
     
     uint32_t vtable_len = (uint32_t) (vtable_end - vtable_start);
     
     // copy vtable to userspace
     uint64_t *buf = calloc(1, vtable_len);
-    kread(vtable_start, buf, vtable_len);
+    KernelRead(vtable_start, buf, vtable_len);
     
     // alter it
     buf[getOFVariablePerm/sizeof(uint64_t)] = buf[searchNVRAMProperty/sizeof(uint64_t)];
     
     // allocate buffer in kernel and copy it back
-    uint64_t fake_vtable = kmem_alloc_wired(vtable_len);
-    kwrite(fake_vtable, buf, vtable_len);
+    uint64_t fake_vtable = Kernel_alloc_wired(vtable_len);
+    KernelWrite(fake_vtable, buf, vtable_len);
     
     // replace vtable on IODTNVRAM object
-    kwrite64(IODTNVRAMObj, fake_vtable);
+    KernelWrite_64bits(IODTNVRAMObj, fake_vtable);
     
     free(buf);
 }
@@ -96,7 +96,7 @@ int locknvram(void) {
         return -1;
     }
     
-    kwrite64(obj, orig_vtable);
+    KernelWrite_64bits(obj, orig_vtable);
     
     printf("[+] Locked nvram\n");
     return 0;

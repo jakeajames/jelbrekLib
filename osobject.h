@@ -1,10 +1,10 @@
-#define OSDictionary_ItemCount(dict) kread32(dict+20)
-#define OSDictionary_ItemBuffer(dict) kread64(dict+32)
-#define OSDictionary_ItemKey(buffer, idx) kread64(buffer+16*idx)
-#define OSDictionary_ItemValue(buffer, idx) kread64(buffer+16*idx+8)
-#define OSString_CStringPtr(str) kread64(str + 0x10)
-#define OSArray_ItemCount(arr) kread32(arr+0x14)
-#define OSArray_ItemBuffer(arr) kread64(arr+32)
+#define OSDictionary_ItemCount(dict) KernelRead_32bits(dict+20)
+#define OSDictionary_ItemBuffer(dict) KernelRead_64bits(dict+32)
+#define OSDictionary_ItemKey(buffer, idx) KernelRead_64bits(buffer+16*idx)
+#define OSDictionary_ItemValue(buffer, idx) KernelRead_64bits(buffer+16*idx+8)
+#define OSString_CStringPtr(str) KernelRead_64bits(str + 0x10)
+#define OSArray_ItemCount(arr) KernelRead_32bits(arr+0x14)
+#define OSArray_ItemBuffer(arr) KernelRead_64bits(arr+32)
 
 // see osobject.c for info
 

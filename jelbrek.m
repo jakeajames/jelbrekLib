@@ -1,8 +1,8 @@
 #import "jelbrek.h"
 
-uint32_t kaslr_slide;
-uint64_t kernel_base;
-mach_port_t tfp0;
+uint32_t KASLR_Slide;
+uint64_t KernelBase;
+mach_port_t TFP0;
 
 int init_jelbrek(mach_port_t tfpzero) {
     printf("[*] Initializing jelbrekLib\n");
@@ -14,17 +14,17 @@ int init_jelbrek(mach_port_t tfpzero) {
     offsets_init(); // Ian Beer's offset struct
     
     //------- init the required variables -------//
-    tfp0 = tfpzero;
-    kernel_base = find_kernel_base();
-    if (!kernel_base) {
+    TFP0 = tfpzero;
+    KernelBase = FindKernelBase();
+    if (!KernelBase) {
         printf("[-] failed to find kernel base\n");
         return 2; //theoretically this can never happen but meh
     }
-    kaslr_slide = kernel_base - 0xFFFFFFF007004000; // slid kernel base - kernel base = kaslr slide
+    KASLR_Slide = KernelBase - 0xFFFFFFF007004000; // slid kernel base - kernel base = kaslr slide
     
     //---- init utilities ----//
-    init_kernel_utils(tfp0); // memory stuff
-    int ret = init_kernel(kernel_base, NULL); // patchfinder
+    init_kernel_utils(TFP0); // memory stuff
+    int ret = InitPatchfinder(KernelBase, NULL); // patchfinder
     if (ret) {
         printf("[-] Failed to initialize patchfinder\n");
         return 3;
@@ -46,7 +46,7 @@ int init_jelbrek(mach_port_t tfpzero) {
     }
     printf("[+] Initialized KernelSymbolFinder\n");
     
-    init_kexecute(); //kernel execution
+    init_Kernel_Execute(); //kernel execution
     if (init_offsets()) { //vnode stuff
         printf("[-] Error gaining symbols\n");
     }
@@ -56,8 +56,8 @@ int init_jelbrek(mach_port_t tfpzero) {
 
 void term_jelbrek() {
     printf("[*] Cleaning up...\n");
-    term_kernel(); // free memory used by patchfinder
-    term_kexecute(); // free stuff used by kexecute
+    TermPatchfinder(); // free memory used by patchfinder
+    term_Kernel_Execute(); // free stuff used by kexecute
     unlink("/var/mobile/kernelcache.dec");
     unlink("/var/mobile/kernelcache");
 }
@@ -201,12 +201,12 @@ int trustbin(const char *path) {
         }
     }
     
-    uint64_t trust_chain = find_trustcache();
+    uint64_t trust_chain = Find_trustcache();
     
     printf("[*] trust_chain at 0x%llx\n", trust_chain);
     
     struct trust_chain fake_chain;
-    fake_chain.next = kread64(trust_chain);
+    fake_chain.next = KernelRead_64bits(trust_chain);
     *(uint64_t *)&fake_chain.uuid[0] = 0xabadbabeabadbabe;
     *(uint64_t *)&fake_chain.uuid[8] = 0xabadbabeabadbabe;
     
@@ -229,73 +229,73 @@ int trustbin(const char *path) {
     fake_chain.count = cnt;
     
     size_t length = (sizeof(fake_chain) + cnt * sizeof(hash_t) + 0xFFFF) & ~0xFFFF;
-    uint64_t kernel_trust = kalloc(length);
+    uint64_t kernel_trust = Kernel_alloc(length);
     printf("[*] allocated: 0x%zx => 0x%llx\n", length, kernel_trust);
     
-    kwrite(kernel_trust, &fake_chain, sizeof(fake_chain));
-    kwrite(kernel_trust + sizeof(fake_chain), allhash, cnt * sizeof(hash_t));
-    kwrite64(trust_chain, kernel_trust);
+    KernelWrite(kernel_trust, &fake_chain, sizeof(fake_chain));
+    KernelWrite(kernel_trust + sizeof(fake_chain), allhash, cnt * sizeof(hash_t));
+    KernelWrite_64bits(trust_chain, kernel_trust);
     
     return 0;
 }
 
 BOOL unsandbox(pid_t pid) {
-    uint64_t proc = proc_for_pid(pid); // pid's proccess structure on the kernel
-    uint64_t ucred = kread64(proc + offsetof_p_ucred); // pid credentials
-    kwrite64(kread64(ucred + offsetof_ucred_cr_label /* MAC label */) + offsetof_sandbox_slot /* First slot is AMFI's. so, this is second? */, 0); //get rid of sandbox by nullifying it
+    uint64_t proc = proc_of_pid(pid); // pid's proccess structure on the kernel
+    uint64_t ucred = KernelRead_64bits(proc + off_p_ucred); // pid credentials
+    KernelWrite_64bits(KernelRead_64bits(ucred + off_ucred_cr_label /* MAC label */) + off_sandbox_slot /* First slot is AMFI's. so, this is second? */, 0); //get rid of sandbox by nullifying it
     
-    return (kread64(kread64(ucred + offsetof_ucred_cr_label) + offsetof_sandbox_slot) == 0) ? YES : NO;
+    return (KernelRead_64bits(KernelRead_64bits(ucred + off_ucred_cr_label) + off_sandbox_slot) == 0) ? YES : NO;
 }
 
 BOOL setcsflags(pid_t pid) {
-    uint64_t proc = proc_for_pid(pid);
-    uint32_t csflags = kread32(proc + offsetof_p_csflags);
+    uint64_t proc = proc_of_pid(pid);
+    uint32_t csflags = KernelRead_32bits(proc + off_p_csflags);
     uint32_t newflags = (csflags | CS_PLATFORM_BINARY | CS_INSTALLER | CS_GET_TASK_ALLOW | CS_DEBUGGED) & ~(CS_RESTRICT | CS_HARD | CS_KILL);
-    kwrite32(proc + offsetof_p_csflags, newflags);
+    KernelWrite_32bits(proc + off_p_csflags, newflags);
     
-    return (kread32(proc + offsetof_p_csflags) == newflags) ? NO : YES;
+    return (KernelRead_32bits(proc + off_p_csflags) == newflags) ? NO : YES;
 }
 
 BOOL rootify(pid_t pid) {
-    uint64_t proc = proc_for_pid(pid);
-    uint64_t ucred = kread64(proc + offsetof_p_ucred);
+    uint64_t proc = proc_of_pid(pid);
+    uint64_t ucred = KernelRead_64bits(proc + off_p_ucred);
     //make everything 0 without setuid(0), pretty straightforward.
-    kwrite32(proc + offsetof_p_uid, 0);
-    kwrite32(proc + offsetof_p_ruid, 0);
-    kwrite32(proc + offsetof_p_gid, 0);
-    kwrite32(proc + offsetof_p_rgid, 0);
-    kwrite32(ucred + offsetof_ucred_cr_uid, 0);
-    kwrite32(ucred + offsetof_ucred_cr_ruid, 0);
-    kwrite32(ucred + offsetof_ucred_cr_svuid, 0);
-    kwrite32(ucred + offsetof_ucred_cr_ngroups, 1);
-    kwrite32(ucred + offsetof_ucred_cr_groups, 0);
-    kwrite32(ucred + offsetof_ucred_cr_rgid, 0);
-    kwrite32(ucred + offsetof_ucred_cr_svgid, 0);
+    KernelWrite_32bits(proc + off_p_uid, 0);
+    KernelWrite_32bits(proc + off_p_ruid, 0);
+    KernelWrite_32bits(proc + off_p_gid, 0);
+    KernelWrite_32bits(proc + off_p_rgid, 0);
+    KernelWrite_32bits(ucred + off_ucred_cr_uid, 0);
+    KernelWrite_32bits(ucred + off_ucred_cr_ruid, 0);
+    KernelWrite_32bits(ucred + off_ucred_cr_svuid, 0);
+    KernelWrite_32bits(ucred + off_ucred_cr_ngroups, 1);
+    KernelWrite_32bits(ucred + off_ucred_cr_groups, 0);
+    KernelWrite_32bits(ucred + off_ucred_cr_rgid, 0);
+    KernelWrite_32bits(ucred + off_ucred_cr_svgid, 0);
     
-    return (kread32(proc + offsetof_p_uid) == 0) ? YES : NO;
+    return (KernelRead_32bits(proc + off_p_uid) == 0) ? YES : NO;
 }
 
 void platformize(pid_t pid) {
-    uint64_t proc = proc_for_pid(pid);
-    uint64_t task = kread64(proc + offsetof_task);
-    uint32_t t_flags = kread32(task + offsetof_t_flags);
+    uint64_t proc = proc_of_pid(pid);
+    uint64_t task = KernelRead_64bits(proc + off_task);
+    uint32_t t_flags = KernelRead_32bits(task + off_t_flags);
     t_flags |= 0x400; // add TF_PLATFORM flag, = 0x400
-    kwrite32(task+offsetof_t_flags, t_flags);
-    uint32_t csflags = kread32(proc + offsetof_p_csflags);
-    kwrite32(proc + offsetof_p_csflags, csflags | 0x24004001u); //patch csflags
+    KernelWrite_32bits(task+off_t_flags, t_flags);
+    uint32_t csflags = KernelRead_32bits(proc + off_p_csflags);
+    KernelWrite_32bits(proc + off_p_csflags, csflags | 0x24004001u); //patch csflags
 }
 
 BOOL entitlePid(pid_t pid, const char *ent, BOOL val) {
-    uint64_t proc = proc_for_pid(pid);
-    uint64_t ucred = kread64(proc + offsetof_p_ucred);
-    uint64_t entitlements = kread64(kread64(ucred + offsetof_ucred_cr_label) + offsetof_amfi_slot);
+    uint64_t proc = proc_of_pid(pid);
+    uint64_t ucred = KernelRead_64bits(proc + off_p_ucred);
+    uint64_t entitlements = KernelRead_64bits(KernelRead_64bits(ucred + off_ucred_cr_label) + off_amfi_slot);
     
     if (OSDictionary_GetItem(entitlements, ent) == 0) {
         printf("[*] Setting Entitlements...\n");
         uint64_t entval = OSDictionary_GetItem(entitlements, ent);
         
         printf("[i] before: %s is 0x%llx\n", ent, entval);
-        OSDictionary_SetItem(entitlements, ent, (val) ? find_OSBoolean_True() : find_OSBoolean_False());
+        OSDictionary_SetItem(entitlements, ent, (val) ? Find_OSBoolean_True() : Find_OSBoolean_False());
         
         entval = OSDictionary_GetItem(entitlements, ent);
         printf("[i] after: %s is 0x%llx\n", ent, entval);
@@ -306,11 +306,11 @@ BOOL entitlePid(pid_t pid, const char *ent, BOOL val) {
 }
 
 uint64_t borrowCredsFromPid(pid_t target, pid_t donor) {
-    uint64_t proc = proc_for_pid(target);
-    uint64_t donorproc = proc_for_pid(donor);
-    uint64_t cred = kread64(proc + offsetof_p_ucred);
-    uint64_t donorcred = kread64(donorproc + offsetof_p_ucred);
-    kwrite64(proc + offsetof_p_ucred, donorcred);
+    uint64_t proc = proc_of_pid(target);
+    uint64_t donorproc = proc_of_pid(donor);
+    uint64_t cred = KernelRead_64bits(proc + off_p_ucred);
+    uint64_t donorcred = KernelRead_64bits(donorproc + off_p_ucred);
+    KernelWrite_64bits(proc + off_p_ucred, donorcred);
     return cred;
 }
 
@@ -325,18 +325,18 @@ uint64_t borrowCredsFromDonor(pid_t target, char *binary, char *arg1, char *arg2
     kill(pd, SIGSTOP); // suspend
     
     platformize(pd);
-    uint64_t proc = proc_for_pid(target);
-    uint64_t donorproc = proc_for_pid(pd);
-    uint64_t cred = kread64(proc + offsetof_p_ucred);
-    uint64_t donorcred = kread64(donorproc + offsetof_p_ucred);
-    kwrite64(proc + offsetof_p_ucred, donorcred);
+    uint64_t proc = proc_of_pid(target);
+    uint64_t donorproc = proc_of_pid(pd);
+    uint64_t cred = KernelRead_64bits(proc + off_p_ucred);
+    uint64_t donorcred = KernelRead_64bits(donorproc + off_p_ucred);
+    KernelWrite_64bits(proc + off_p_ucred, donorcred);
     
     return cred;
 }
 
 void undoCredDonation(pid_t target, uint64_t origcred) {
-    uint64_t proc = proc_for_pid(target);
-    kwrite64(proc + offsetof_p_ucred, origcred);
+    uint64_t proc = proc_of_pid(target);
+    KernelWrite_64bits(proc + off_p_ucred, origcred);
 }
 
 int launchAsPlatform(char *binary, char *arg1, char *arg2, char *arg3, char *arg4, char *arg5, char *arg6, char**env) {
@@ -374,11 +374,11 @@ int launch(char *binary, char *arg1, char *arg2, char *arg3, char *arg4, char *a
 }
 
 BOOL remount1126() {
-    uint64_t _rootvnode = find_rootvnode();
-    uint64_t rootfs_vnode = kread64(_rootvnode);
+    uint64_t _rootvnode = getVnodeAtPath("/");
+    uint64_t rootfs_vnode = KernelRead_64bits(_rootvnode);
     printf("\n[*] vnode of /: 0x%llx\n", rootfs_vnode);
-    uint64_t v_mount = kread64(rootfs_vnode + offsetof_v_mount);
-    uint32_t v_flag = kread32(v_mount + offsetof_mnt_flag);
+    uint64_t v_mount = KernelRead_64bits(rootfs_vnode + off_v_mount);
+    uint32_t v_flag = KernelRead_32bits(v_mount + off_mnt_flag);
     printf("[*] Removing RDONLY, NOSUID and ROOTFS flags\n");
     printf("[*] Flags before 0x%x\n", v_flag);
     v_flag &= ~MNT_NOSUID;
@@ -386,14 +386,14 @@ BOOL remount1126() {
     v_flag &= ~MNT_ROOTFS;
     
     printf("[*] Flags now 0x%x\n", v_flag);
-    kwrite32(v_mount + offsetof_mnt_flag, v_flag);
+    KernelWrite_32bits(v_mount + off_mnt_flag, v_flag);
     
     char *nmz = strdup("/dev/disk0s1s1");
     int rv = mount("apfs", "/", MNT_UPDATE, (void *)&nmz);
     printf("[*] Remounting /, return value = %d\n", rv);
     
-    v_mount = kread64(rootfs_vnode + offsetof_v_mount);
-    kwrite32(v_mount + offsetof_mnt_flag, v_flag);
+    v_mount = KernelRead_64bits(rootfs_vnode + off_v_mount);
+    KernelWrite_32bits(v_mount + off_mnt_flag, v_flag);
     
     int fd = open("/RWTEST", O_RDONLY);
     if (fd == -1) {
@@ -429,10 +429,10 @@ int remountRootFS() {
     if (kCFCoreFoundationVersionNumber > 1451.51 && list_snapshots("/")) { //the second check makes it only run once
         
         uint64_t devVnode = getVnodeAtPath("/dev/disk0s1s1");
-        uint64_t specinfo = kread64(devVnode + offsetof_v_specinfo);
+        uint64_t specinfo = KernelRead_64bits(devVnode + off_v_specinfo);
         
         // clear specflags in order to be able to mount twice
-        kwrite32(specinfo + offsetof_specflags, 0);
+        KernelWrite_32bits(specinfo + off_specflags, 0);
         
         if ([[NSFileManager defaultManager] fileExistsAtPath:@"/var/rootfsmnt"])
             rmdir("/var/rootfsmnt");
@@ -502,7 +502,7 @@ uint64_t getVnodeAtPath(const char *path) {
 // https://gist.github.com/ccbrown/9722406
 void HexDump(uint64_t addr, size_t size) {
     void *data = malloc(size);
-    kread(addr, data, size);
+    KernelRead(addr, data, size);
     char ascii[17];
     size_t i, j;
     ascii[16] = '\0';

