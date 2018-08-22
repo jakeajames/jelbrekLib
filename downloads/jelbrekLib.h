@@ -346,3 +346,4 @@ unsigned int pid_of_procName(char *nm);
      0: Success
  */
 int inject_dylib(pid_t pid, char *loaded_dylib);
+

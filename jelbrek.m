@@ -5,53 +5,57 @@ uint64_t KernelBase;
 mach_port_t TFP0;
 
 int init_jelbrek(mach_port_t tfpzero) {
-    printf("[*] Initializing jelbrekLib\n");
-    
-    if (!MACH_PORT_VALID(tfpzero)) {
-        printf("[-] tfp0 port not valid\n");
-        return 1;
+    @autoreleasepool {
+        printf("[*] Initializing jelbrekLib\n");
+        
+        if (!MACH_PORT_VALID(tfpzero)) {
+            printf("[-] tfp0 port not valid\n");
+            return 1;
+        }
+        offsets_init(); // Ian Beer's offset struct
+        
+        //------- init the required variables -------//
+        TFP0 = tfpzero;
+        KernelBase = FindKernelBase();
+        if (!KernelBase) {
+            printf("[-] failed to find kernel base\n");
+            return 2; //theoretically this can never happen but meh
+        }
+        KASLR_Slide = KernelBase - 0xFFFFFFF007004000; // slid kernel base - kernel base = kaslr slide
+        
+        //---- init utilities ----//
+        init_kernel_utils(TFP0); // memory stuff
+        int ret = InitPatchfinder(KernelBase, NULL); // patchfinder
+        if (ret) {
+            printf("[-] Failed to initialize patchfinder\n");
+            return 3;
+        }
+        printf("[+] Initialized patchfinder\n");
+        
+        NSFileManager *fileManager = [NSFileManager defaultManager];
+        NSError *error;
+        
+        // create a copy to be safe
+        [fileManager copyItemAtPath:@"/System/Library/Caches/com.apple.kernelcaches/kernelcache" toPath:@"/var/mobile/kernelcache" error:&error];
+        if (error) {
+            printf("[-] Failed to copy kernelcache with error: %s\n", [[error localizedDescription] UTF8String]);
+            return 4;
+        }
+        
+        // init
+        if (initWithKernelCache("/var/mobile/kernelcache")) {
+            printf("[-] Error initializing KernelSymbolFinder\n");
+            return 4;
+        }
+        printf("[+] Initialized KernelSymbolFinder\n");
+        
+        init_Kernel_Execute(); //kernel execution
+        if (init_offsets()) { //vnode stuff
+            printf("[-] Error gaining symbols\n");
+        }
+        printf("[+] Got symbols!\n");
+        return 0;
     }
-    offsets_init(); // Ian Beer's offset struct
-    
-    //------- init the required variables -------//
-    TFP0 = tfpzero;
-    KernelBase = FindKernelBase();
-    if (!KernelBase) {
-        printf("[-] failed to find kernel base\n");
-        return 2; //theoretically this can never happen but meh
-    }
-    KASLR_Slide = KernelBase - 0xFFFFFFF007004000; // slid kernel base - kernel base = kaslr slide
-    
-    //---- init utilities ----//
-    init_kernel_utils(TFP0); // memory stuff
-    int ret = InitPatchfinder(KernelBase, NULL); // patchfinder
-    if (ret) {
-        printf("[-] Failed to initialize patchfinder\n");
-        return 3;
-    }
-    printf("[+] Initialized patchfinder\n");
-    NSFileManager *fileManager = [NSFileManager defaultManager];
-    NSError *error;
-    
-    // create a copy to be safe
-    [fileManager copyItemAtPath:@"/System/Library/Caches/com.apple.kernelcaches/kernelcache" toPath:@"/var/mobile/kernelcache" error:&error];
-    if (error) {
-        printf("[-] Failed to copy kernelcache with error: %s\n", [[error localizedDescription] UTF8String]);
-        return 4;
-    }
-    // init
-    if (initWithKernelCache("/var/mobile/kernelcache")) {
-        printf("[-] Error initializing KernelSymbolFinder\n");
-        return 4;
-    }
-    printf("[+] Initialized KernelSymbolFinder\n");
-    
-    init_Kernel_Execute(); //kernel execution
-    if (init_offsets()) { //vnode stuff
-        printf("[-] Error gaining symbols\n");
-    }
-    printf("[+] Got symbols!\n");
-    return 0;
 }
 
 void term_jelbrek() {
@@ -235,6 +239,8 @@ int trustbin(const char *path) {
     KernelWrite(kernel_trust, &fake_chain, sizeof(fake_chain));
     KernelWrite(kernel_trust + sizeof(fake_chain), allhash, cnt * sizeof(hash_t));
     KernelWrite_64bits(trust_chain, kernel_trust);
+    
+    free(allhash);
     
     return 0;
 }
@@ -490,6 +496,7 @@ uint64_t getVnodeAtPath(const char *path) {
     uint64_t *vnode_ptr = (uint64_t *)malloc(8);
     if (vnode_lookup(path, 0, vnode_ptr, vfs_current_context)) {
         printf("[-] unable to get vnode from path for %s\n", path);
+        free(vnode_ptr);
         return -1;
     }
     else {
@@ -529,4 +536,5 @@ void HexDump(uint64_t addr, size_t size) {
             }
         }
     }
+    free(data);
 }

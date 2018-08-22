@@ -26,7 +26,7 @@ uint64_t TaskSelfAddr() {
     uint64_t selfproc = proc_of_pid(getpid());
     if (selfproc == 0) {
         fprintf(stderr, "failed to find our task addr\n");
-        exit(EXIT_FAILURE);
+        return -1;
     }
     uint64_t addr = KernelRead_64bits(selfproc + off_task);
     
@@ -134,7 +134,7 @@ uint64_t Kernel_alloc_wired(uint64_t size) {
     
     err = mach_vm_wire(FakeHostPriv(), tfpzero, addr, ksize, VM_PROT_READ|VM_PROT_WRITE);
     if (err != KERN_SUCCESS) {
-        printf("unable to wire kernel memory via tfp0: %s %x\n", mach_error_string(err), err);
+        printf("[-] unable to wire kernel memory via tfp0: %s %x\n", mach_error_string(err), err);
         sleep(3);
         return 0;
     }
@@ -152,7 +152,7 @@ size_t KernelRead(uint64_t where, void *p, size_t size) {
         }
         rv = mach_vm_read_overwrite(tfpzero, where + offset, chunk, (mach_vm_address_t)p + offset, &sz);
         if (rv || sz == 0) {
-            printf("[*] error on KernelRead(0x%016llx)\n", where);
+            printf("[-] error on KernelRead(0x%016llx)\n", where);
             break;
         }
         offset += sz;
@@ -182,7 +182,7 @@ size_t KernelWrite(uint64_t where, const void *p, size_t size) {
         }
         rv = mach_vm_write(tfpzero, where + offset, (mach_vm_offset_t)p + offset, chunk);
         if (rv) {
-            printf("[*] error on KernelWrite(0x%016llx)\n", where);
+            printf("[-] error on KernelWrite(0x%016llx)\n", where);
             break;
         }
         offset += chunk;
@@ -290,13 +290,13 @@ uint64_t ZmFixAddr(uint64_t addr) {
         //printf("zm_range: 0x%llx - 0x%llx (read 0x%zx, exp 0x%zx)\n", zm_hdr.start, zm_hdr.end, r, sizeof(zm_hdr));
         
         if (r != sizeof(zm_hdr) || zm_hdr.start == 0 || zm_hdr.end == 0) {
-            printf("KernelRead of zone_map failed!\n");
-            exit(1);
+            printf("[-] KernelRead of zone_map failed!\n");
+            return 1;
         }
         
         if (zm_hdr.end - zm_hdr.start > 0x100000000) {
-            printf("zone_map is too big, sorry.\n");
-            exit(1);
+            printf("[-] zone_map is too big, sorry.\n");
+            return 1;
         }
     }
     

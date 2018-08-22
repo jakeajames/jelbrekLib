@@ -259,5 +259,8 @@ extern "C" int lzssdec(int argc,char**argv)
     
     if (g_debug) fprintf(stderr, "flush: %d bytes\n", dstused);
     
+    free(ibuf);
+    free(obuf);
+    
     return 0;
 }
