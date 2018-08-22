@@ -25,7 +25,8 @@ h
 - stek29 for nvramunlock & lock and hsp4 patch
 - theninjaprawn & Ian Beer for dylib injection
 - Luca Todesco for the remount patch technique
-- Umang Raghuvanshi for the rename-APFS-snapshot technique
+- Umang Raghuvanshi for the original remount idea
+- pwn20wnd for the implementation of the rename-APFS-snapshot technique
 - Symbol finding by me ;) https://github.com/jakeajames/kernelSymbolFinder
 - The rest of patches are fairly simple and shouldn't be considered property of anyone in my opinion. Everyone who has enough knowledge can write them fairly easily
 
