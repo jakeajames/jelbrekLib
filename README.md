@@ -15,8 +15,8 @@ h
 
 # Issues
 
-- Not everything tested
-- ~~This conflicts with almost every possible exploit from Ian Beer or fork of it due to similar naming. If that happens remove every patch except the tfp0 variable (don't name it 'tfp0') or rename the functions in either the project or library~~ Latest commit renames a LOT of variables which should solve naming conflicts. If one still happens you can always change names :)
+- Not everything tested, but stuff should work
+- AMFID patch won't resist after app enters background. Fix would be using a daemon (like amfidebilitate; well one is coming soon, open-source ;D) or injecting a dylib
 
 # Credits
 
@@ -27,6 +27,7 @@ h
 - Luca Todesco for the remount patch technique
 - Umang Raghuvanshi for the original remount idea
 - pwn20wnd for the implementation of the rename-APFS-snapshot technique
+- AMFID dylib-less patch technique by Ian Beer reworked with the patch code from Electra's amfid_payload (stek29 & coolstar)
 - Symbol finding by me ;) https://github.com/jakeajames/kernelSymbolFinder
 - The rest of patches are fairly simple and shouldn't be considered property of anyone in my opinion. Everyone who has enough knowledge can write them fairly easily
 
