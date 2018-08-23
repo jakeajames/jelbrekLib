@@ -16,6 +16,10 @@ int init_jelbrek(mach_port_t tfpzero) {
         
         //------- init the required variables -------//
         TFP0 = tfpzero;
+        
+        //---- init utilities ----//
+        init_kernel_utils(TFP0); // memory stuff
+        
         KernelBase = FindKernelBase();
         if (!KernelBase) {
             printf("[-] failed to find kernel base\n");
@@ -23,8 +27,6 @@ int init_jelbrek(mach_port_t tfpzero) {
         }
         KASLR_Slide = KernelBase - 0xFFFFFFF007004000; // slid kernel base - kernel base = kaslr slide
         
-        //---- init utilities ----//
-        init_kernel_utils(TFP0); // memory stuff
         int ret = InitPatchfinder(KernelBase, NULL); // patchfinder
         if (ret) {
             printf("[-] Failed to initialize patchfinder\n");
