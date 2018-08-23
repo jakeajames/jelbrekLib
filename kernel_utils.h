@@ -14,6 +14,8 @@ kern_return_t mach_vm_write(vm_map_t target_task, mach_vm_address_t address, vm_
 kern_return_t mach_vm_deallocate(vm_map_t target, mach_vm_address_t address, mach_vm_size_t size);
 kern_return_t mach_vm_protect (vm_map_t target_task, mach_vm_address_t address,  mach_vm_size_t size, boolean_t set_maximum, vm_prot_t new_protection);
 kern_return_t mach_vm_read(vm_map_t target_task, mach_vm_address_t address, mach_vm_size_t size, vm_offset_t *data, mach_msg_type_number_t *dataCnt);
+kern_return_t mach_vm_region(vm_map_t target_task, mach_vm_address_t *address, mach_vm_size_t *size, vm_region_flavor_t flavor, vm_region_info_t info, mach_msg_type_number_t *infoCnt, mach_port_t *object_name);
+
 
 // init function
 void init_kernel_utils(mach_port_t tfp0);
@@ -42,6 +44,11 @@ uint64_t Kernel_alloc_wired(uint64_t size);
 uint64_t proc_of_pid(pid_t pid);
 uint64_t proc_of_procName(char *nm);
 unsigned int pid_of_procName(char *nm);
+uint64_t taskStruct_of_pid(pid_t pid);
+uint64_t taskStruct_of_procName(char *nm);
+uint64_t taskPortKaddr_of_pid(pid_t pid);
+uint64_t taskPortKaddr_of_procName(char *nm);
+mach_port_t task_for_pid_in_kernel(pid_t pid);
 
 // used to fix what kexecute returns
 typedef struct {

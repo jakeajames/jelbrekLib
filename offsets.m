@@ -15,9 +15,9 @@
 #define SYSTEM_VERSION_LESS_THAN(v)                 ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedAscending)
 #define SYSTEM_VERSION_LESS_THAN_OR_EQUAL_TO(v)     ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] != NSOrderedDescending)
 
-int* offsets = NULL;
+int* _offsets = NULL;
 
-int kstruct_offsets_11_0[] = {
+int _kstruct_offsets_11_0[] = {
   0xb,   // KSTRUCT_OFFSET_TASK_LCK_MTX_TYPE,
   0x10,  // KSTRUCT_OFFSET_TASK_REF_COUNT,
   0x14,  // KSTRUCT_OFFSET_TASK_ACTIVE,
@@ -56,7 +56,7 @@ int kstruct_offsets_11_0[] = {
   0x6c,  // KFREE_ADDR_OFFSET
 };
 
-int kstruct_offsets_11_3[] = {
+int _kstruct_offsets_11_3[] = {
   0xb,   // KSTRUCT_OFFSET_TASK_LCK_MTX_TYPE,
   0x10,  // KSTRUCT_OFFSET_TASK_REF_COUNT,
   0x14,  // KSTRUCT_OFFSET_TASK_ACTIVE,
@@ -95,27 +95,24 @@ int kstruct_offsets_11_3[] = {
   0x7c,  // KFREE_ADDR_OFFSET
 };
 
-int koffset(enum kstruct_offset offset) {
-  if (offsets == NULL) {
+int _koffset(enum _kstruct_offset offset) {
+  if (_offsets == NULL) {
     printf("need to call offsets_init() prior to querying offsets\n");
     return 0;
   }
-  return offsets[offset];
+  return _offsets[offset];
 }
 
 
-void offsets_init() {
-  if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"11.4")) {
-    printf("this bug is patched in iOS 11.4 and above\n");
-    exit(EXIT_FAILURE);
-  } else if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"11.3")) {
-    printf("offsets selected for iOS 11.3 or above\n");
-    offsets = kstruct_offsets_11_3;
+void _offsets_init() {
+  if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"11.3")) {
+    printf("[i] offsets selected for iOS 11.3 or above\n");
+    _offsets = _kstruct_offsets_11_3;
   } else if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"11.0")) {
-    printf("offsets selected for iOS 11.0 to 11.2.6\n");
-    offsets = kstruct_offsets_11_0;
+    printf("[i] offsets selected for iOS 11.0 to 11.2.6\n");
+    _offsets = _kstruct_offsets_11_0;
   } else {
-    printf("iOS version too low, 11.0 required\n");
+    printf("[-] iOS version too low, 11.0 required\n");
     exit(EXIT_FAILURE);
   }
 }

@@ -54,9 +54,3 @@ unsigned off_specflags = 0x10;
 unsigned off_mnt_flag = 0x70;            // mount::mnt_flag
 unsigned off_mnt_data = 0x8f8;           // mount::mnt_data
 
-typedef unsigned long long uint64_t;
-
-uint64_t ksym_vnode_lookup = 0x0;
-uint64_t ksym_vfs_current_context = 0x0;
-uint64_t ksym_vnode_put = 0x0;
-uint64_t vfs_current_context = 0x0;

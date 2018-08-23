@@ -3,6 +3,7 @@
 uint32_t KASLR_Slide;
 uint64_t KernelBase;
 mach_port_t TFP0;
+NSString *newPath;
 
 int init_jelbrek(mach_port_t tfpzero) {
     @autoreleasepool {
@@ -12,7 +13,7 @@ int init_jelbrek(mach_port_t tfpzero) {
             printf("[-] tfp0 port not valid\n");
             return 1;
         }
-        offsets_init(); // Ian Beer's offset struct
+        _offsets_init(); // Ian Beer's offset struct
         
         //------- init the required variables -------//
         TFP0 = tfpzero;
@@ -37,25 +38,37 @@ int init_jelbrek(mach_port_t tfpzero) {
         NSFileManager *fileManager = [NSFileManager defaultManager];
         NSError *error;
         
+        // random enough
+        // let's say this is ran from an unsandboxed process
+        // home dir is /var/mobile/Documents
+        // there's a chance a file named kernelcache is there
+        // who knows what people do XD, at least I have done it
+        NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+        [formatter setDateFormat:@"dd.MM.YY:HH.mm.ss"];
+        
+        NSString *docs = [[[fileManager URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] lastObject] path];
+        mkdir(strdup([docs UTF8String]), 0777);
+        newPath = [docs stringByAppendingPathComponent:[NSString stringWithFormat:@"%@_kernelcache", [formatter stringFromDate:[NSDate date]]]];
+        
+        printf("[*] copying to %s\n", [newPath UTF8String]);
+        
         // create a copy to be safe
-        [fileManager copyItemAtPath:@"/System/Library/Caches/com.apple.kernelcaches/kernelcache" toPath:@"/var/mobile/kernelcache" error:&error];
+        [fileManager copyItemAtPath:@"/System/Library/Caches/com.apple.kernelcaches/kernelcache" toPath:newPath error:&error];
         if (error) {
             printf("[-] Failed to copy kernelcache with error: %s\n", [[error localizedDescription] UTF8String]);
             return 4;
         }
         
         // init
-        if (initWithKernelCache("/var/mobile/kernelcache")) {
+        if (initWithKernelCache(strdup([newPath UTF8String]))) {
             printf("[-] Error initializing KernelSymbolFinder\n");
             return 4;
         }
         printf("[+] Initialized KernelSymbolFinder\n");
+        unlink(strdup([newPath UTF8String]));
         
         init_Kernel_Execute(); //kernel execution
-        if (init_offsets()) { //vnode stuff
-            printf("[-] Error gaining symbols\n");
-        }
-        printf("[+] Got symbols!\n");
+        
         return 0;
     }
 }
@@ -64,8 +77,7 @@ void term_jelbrek() {
     printf("[*] Cleaning up...\n");
     TermPatchfinder(); // free memory used by patchfinder
     term_Kernel_Execute(); // free stuff used by kexecute
-    unlink("/var/mobile/kernelcache.dec");
-    unlink("/var/mobile/kernelcache");
+    unlink(strcat(strdup([newPath UTF8String]), ".dec"));
 }
 
 // Adds macho binaries on the AMFI trustcache
@@ -327,7 +339,7 @@ uint64_t borrowCredsFromDonor(pid_t target, char *binary, char *arg1, char *arg2
     pid_t pd;
     const char* args[] = {binary, arg1, arg2, arg3, arg4, arg5, arg6,  NULL};
     
-    int rv = posix_spawn(&pd, binary, NULL, NULL, (char **)&args, env);
+    posix_spawn(&pd, binary, NULL, NULL, (char **)&args, env);
     
     usleep(100);
     kill(pd, SIGSTOP); // suspend
@@ -496,7 +508,7 @@ int remountRootFS() {
 
 uint64_t getVnodeAtPath(const char *path) {
     uint64_t *vnode_ptr = (uint64_t *)malloc(8);
-    if (vnode_lookup(path, 0, vnode_ptr, vfs_current_context)) {
+    if (vnode_lookup(path, 0, vnode_ptr, get_vfs_context())) {
         printf("[-] unable to get vnode from path for %s\n", path);
         free(vnode_ptr);
         return -1;

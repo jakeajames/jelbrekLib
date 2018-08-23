@@ -23,6 +23,7 @@
 #import <Foundation/Foundation.h>
 
 #import "kernel_utils.h"
+#import "inject_criticald.h"
 
 kern_return_t mach_vm_allocate
 (
@@ -403,29 +404,6 @@ uint64_t call_remote(mach_port_t task_port, void* fptr, int n_params, ...)
     return ret_val;
 }
 
-uint64_t binary_load_address(mach_port_t tp) {
-    kern_return_t err;
-    mach_msg_type_number_t region_count = VM_REGION_BASIC_INFO_COUNT_64;
-    memory_object_name_t object_name = MACH_PORT_NULL; /* unused */
-    mach_vm_size_t target_first_size = 0x1000;
-    mach_vm_address_t target_first_addr = 0x0;
-    struct vm_region_basic_info_64 region = {0};
-    err = mach_vm_region(tp,
-                         &target_first_addr,
-                         &target_first_size,
-                         VM_REGION_BASIC_INFO_64,
-                         (vm_region_info_t)&region,
-                         &region_count,
-                         &object_name);
-    
-    if (err != KERN_SUCCESS) {
-        printf("failed to get the region\n");
-        return -1;
-    }
-    
-    return target_first_addr;
-}
-
 int inject_dylib(pid_t pid, char *loaded_dylib) {
     
     task_t remoteTask;
@@ -467,4 +445,5 @@ int inject_dylib(pid_t pid, char *loaded_dylib) {
     
     return 0;
 }
+
 

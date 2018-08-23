@@ -56,11 +56,6 @@ extern unsigned off_specflags;
 extern unsigned off_mnt_flag;
 extern unsigned off_mnt_data;
 
-extern uint64_t ksym_vnode_lookup;
-extern uint64_t ksym_vfs_current_context;
-extern uint64_t ksym_vnode_put;
-extern uint64_t vfs_current_context;
-
 #define	CS_VALID		0x0000001	/* dynamically valid */
 #define CS_ADHOC		0x0000002	/* ad hoc signed */
 #define CS_GET_TASK_ALLOW	0x0000004	/* has get-task-allow entitlement */

@@ -1,4 +1,4 @@
-enum kstruct_offset {
+enum _kstruct_offset {
   /* struct task */
   KSTRUCT_OFFSET_TASK_LCK_MTX_TYPE,
   KSTRUCT_OFFSET_TASK_REF_COUNT,
@@ -46,5 +46,5 @@ enum kstruct_offset {
   KFREE_ADDR_OFFSET,
 };
 
-int koffset(enum kstruct_offset offset);
-void offsets_init(void);
+int _koffset(enum _kstruct_offset offset);
+void _offsets_init(void);

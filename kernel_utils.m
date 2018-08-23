@@ -5,7 +5,7 @@
 #import "offsets.h"
 #import "kexecute.h"
 
-mach_port_t tfpzero;
+static mach_port_t tfpzero;
 
 void init_kernel_utils(mach_port_t tfp0) {
     tfpzero = tfp0;
@@ -25,7 +25,7 @@ uint64_t TaskSelfAddr() {
     
     uint64_t selfproc = proc_of_pid(getpid());
     if (selfproc == 0) {
-        fprintf(stderr, "failed to find our task addr\n");
+        fprintf(stderr, "[-] failed to find our task addr\n");
         return -1;
     }
     uint64_t addr = KernelRead_64bits(selfproc + off_task);
@@ -80,7 +80,7 @@ mach_port_t FakeHostPriv() {
     kern_return_t err;
     err = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &port);
     if (err != KERN_SUCCESS) {
-        printf("failed to allocate port\n");
+        printf("[-] failed to allocate port\n");
         return MACH_PORT_NULL;
     }
     // get a send right
@@ -107,7 +107,7 @@ mach_port_t FakeHostPriv() {
 
 uint64_t Kernel_alloc_wired(uint64_t size) {
     if (tfpzero == MACH_PORT_NULL) {
-        printf("attempt to allocate kernel memory before any kernel memory write primitives available\n");
+        printf("[-] attempt to allocate kernel memory before any kernel memory write primitives available\n");
         sleep(3);
         return 0;
     }
@@ -116,21 +116,21 @@ uint64_t Kernel_alloc_wired(uint64_t size) {
     mach_vm_address_t addr = 0;
     mach_vm_size_t ksize = round_page_kernel(size);
     
-    printf("vm_kernel_page_size: %lx\n", vm_kernel_page_size);
+    printf("[*] vm_kernel_page_size: %lx\n", vm_kernel_page_size);
     
     err = mach_vm_allocate(tfpzero, &addr, ksize+0x4000, VM_FLAGS_ANYWHERE);
     if (err != KERN_SUCCESS) {
-        printf("unable to allocate kernel memory via tfp0: %s %x\n", mach_error_string(err), err);
+        printf("[-] unable to allocate kernel memory via tfp0: %s %x\n", mach_error_string(err), err);
         sleep(3);
         return 0;
     }
     
-    printf("allocated address: %llx\n", addr);
+    printf("[+] allocated address: %llx\n", addr);
     
     addr += 0x3fff;
     addr &= ~0x3fffull;
     
-    printf("address to wire: %llx\n", addr);
+    printf("[*] address to wire: %llx\n", addr);
     
     err = mach_vm_wire(FakeHostPriv(), tfpzero, addr, ksize, VM_PROT_READ|VM_PROT_WRITE);
     if (err != KERN_SUCCESS) {
@@ -216,17 +216,17 @@ void convertPortToTaskPort(mach_port_t port, uint64_t space, uint64_t task_kaddr
     // now make the changes to the port object to make it a task port:
     uint64_t port_kaddr = FindPortAddress(port);
     
-    KernelWrite_32bits(port_kaddr + koffset(KSTRUCT_OFFSET_IPC_PORT_IO_BITS), 0x80000000 | 2);
-    KernelWrite_32bits(port_kaddr + koffset(KSTRUCT_OFFSET_IPC_PORT_IO_REFERENCES), 0xf00d);
-    KernelWrite_32bits(port_kaddr + koffset(KSTRUCT_OFFSET_IPC_PORT_IP_SRIGHTS), 0xf00d);
-    KernelWrite_64bits(port_kaddr + koffset(KSTRUCT_OFFSET_IPC_PORT_IP_RECEIVER), space);
-    KernelWrite_64bits(port_kaddr + koffset(KSTRUCT_OFFSET_IPC_PORT_IP_KOBJECT),  task_kaddr);
+    KernelWrite_32bits(port_kaddr + _koffset(KSTRUCT_OFFSET_IPC_PORT_IO_BITS), 0x80000000 | 2);
+    KernelWrite_32bits(port_kaddr + _koffset(KSTRUCT_OFFSET_IPC_PORT_IO_REFERENCES), 0xf00d);
+    KernelWrite_32bits(port_kaddr + _koffset(KSTRUCT_OFFSET_IPC_PORT_IP_SRIGHTS), 0xf00d);
+    KernelWrite_64bits(port_kaddr + _koffset(KSTRUCT_OFFSET_IPC_PORT_IP_RECEIVER), space);
+    KernelWrite_64bits(port_kaddr + _koffset(KSTRUCT_OFFSET_IPC_PORT_IP_KOBJECT),  task_kaddr);
     
     // swap our receive right for a send right:
     uint64_t task_port_addr = TaskSelfAddr();
-    uint64_t task_addr = KernelRead_64bits(task_port_addr + koffset(KSTRUCT_OFFSET_IPC_PORT_IP_KOBJECT));
-    uint64_t itk_space = KernelRead_64bits(task_addr + koffset(KSTRUCT_OFFSET_TASK_ITK_SPACE));
-    uint64_t is_table = KernelRead_64bits(itk_space + koffset(KSTRUCT_OFFSET_IPC_SPACE_IS_TABLE));
+    uint64_t task_addr = KernelRead_64bits(task_port_addr + _koffset(KSTRUCT_OFFSET_IPC_PORT_IP_KOBJECT));
+    uint64_t itk_space = KernelRead_64bits(task_addr + _koffset(KSTRUCT_OFFSET_TASK_ITK_SPACE));
+    uint64_t is_table = KernelRead_64bits(itk_space + _koffset(KSTRUCT_OFFSET_IPC_SPACE_IS_TABLE));
     
     uint32_t port_index = port >> 8;
     const int sizeof_ipc_entry_t = 0x18;
@@ -255,6 +255,7 @@ uint64_t proc_of_pid(pid_t pid) {
     
     return 0;
 }
+
 uint64_t proc_of_procName(char *nm) {
     uint64_t proc = KernelRead_64bits(Find_allproc());
     char name[40] = {0};
@@ -266,7 +267,6 @@ uint64_t proc_of_procName(char *nm) {
     return 0;
 }
 
-
 unsigned int pid_of_procName(char *nm) {
     uint64_t proc = KernelRead_64bits(Find_allproc());
     char name[40] = {0};
@@ -275,9 +275,95 @@ unsigned int pid_of_procName(char *nm) {
         if (strstr(name, nm)) return KernelRead_32bits(proc + off_p_pid);
         proc = KernelRead_64bits(proc);
     }
+    return -1;
+}
+
+uint64_t taskStruct_of_pid(pid_t pid) {
+    uint64_t task_kaddr = KernelRead_64bits(TaskSelfAddr() + _koffset(KSTRUCT_OFFSET_IPC_PORT_IP_KOBJECT));
+    while (task_kaddr) {
+        uint64_t proc = KernelRead_64bits(task_kaddr + _koffset(KSTRUCT_OFFSET_TASK_BSD_INFO));
+        uint32_t pd = KernelRead_32bits(proc + off_p_pid);
+        if (pd == pid) return task_kaddr;
+        task_kaddr = KernelRead_64bits(task_kaddr + _koffset(KSTRUCT_OFFSET_TASK_PREV));
+    }
     return 0;
 }
 
+uint64_t taskStruct_of_procName(char *nm) {
+    uint64_t task_kaddr = KernelRead_64bits(TaskSelfAddr() + _koffset(KSTRUCT_OFFSET_IPC_PORT_IP_KOBJECT));
+    char name[40] = {0};
+    while (task_kaddr) {
+        uint64_t proc = KernelRead_64bits(task_kaddr + _koffset(KSTRUCT_OFFSET_TASK_BSD_INFO));
+        KernelRead(proc + 0x268, name, 20);
+        if (strstr(name, nm)) return task_kaddr;
+        task_kaddr = KernelRead_64bits(task_kaddr + _koffset(KSTRUCT_OFFSET_TASK_PREV));
+    }
+    return 0;
+}
+
+uint64_t taskPortKaddr_of_pid(pid_t pid) {
+    uint64_t proc = proc_of_pid(pid);
+    if (!proc) {
+        printf("[-] Failed to find proc of pid %d\n", pid);
+        return 0;
+    }
+    uint64_t task = KernelRead_64bits(proc + off_task);
+    uint64_t itk_space = KernelRead_64bits(task + off_itk_space);
+    uint64_t is_table = KernelRead_64bits(itk_space + off_ipc_space_is_table);
+    uint64_t task_port_kaddr = KernelRead_64bits(is_table + 0x18);
+    return task_port_kaddr;
+}
+
+uint64_t taskPortKaddr_of_procName(char *nm) {
+    uint64_t proc = proc_of_procName(nm);
+    if (!proc) {
+        printf("[-] Failed to find proc of process %s\n", nm);
+        return 0;
+    }
+    uint64_t task = KernelRead_64bits(proc + off_task);
+    uint64_t itk_space = KernelRead_64bits(task + off_itk_space);
+    uint64_t is_table = KernelRead_64bits(itk_space + off_ipc_space_is_table);
+    uint64_t task_port_kaddr = KernelRead_64bits(is_table + 0x18);
+    return task_port_kaddr;
+}
+
+// Original method by Ian Beer
+mach_port_t task_for_pid_in_kernel(pid_t pid) {
+    
+    // allocate a new port we have a send right to
+    mach_port_t port = MACH_PORT_NULL;
+    mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &port);
+    mach_port_insert_right(mach_task_self(), port, port, MACH_MSG_TYPE_MAKE_SEND);
+    
+    // find task port in kernel
+    uint64_t task_port_kaddr = taskPortKaddr_of_pid(pid);
+    uint64_t task = KernelRead_64bits(proc_of_pid(pid) + off_task);
+    
+    // leak some refs
+    KernelWrite_32bits(task_port_kaddr + 0x4, 0x383838);
+    KernelWrite_32bits(task + _koffset(KSTRUCT_OFFSET_TASK_REF_COUNT), 0x393939);
+    
+    // get the address of the ipc_port of our allocated port
+    uint64_t selfproc = proc_of_pid(getpid());
+    if (!selfproc) {
+        printf("[-] Failed to find our proc?\n");
+        return MACH_PORT_NULL;
+    }
+    uint64_t selftask = KernelRead_64bits(selfproc + off_task);
+    uint64_t itk_space = KernelRead_64bits(selftask + off_itk_space);
+    uint64_t is_table = KernelRead_64bits(itk_space + off_ipc_space_is_table);
+    uint32_t port_index = port >> 8;
+    
+    // point the port's ie_object to the task port
+    KernelWrite_64bits(is_table + (port_index * 0x18), task_port_kaddr);
+    
+    // remove our recieve right
+    uint32_t ie_bits = KernelRead_32bits(is_table + (port_index * 0x18) + 8);
+    ie_bits &= ~(1 << 17); // clear MACH_PORT_TYPE(MACH_PORT_RIGHT_RECIEVE)
+    KernelWrite_32bits(is_table + (port_index * 0x18) + 8, ie_bits);
+    
+    return port;
+}
 
 uint64_t ZmFixAddr(uint64_t addr) {
     static kmap_hdr_t zm_hdr = {0, 0, 0, 0};
