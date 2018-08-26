@@ -28,6 +28,7 @@ h
 - Umang Raghuvanshi for the original remount idea
 - pwn20wnd for the implementation of the rename-APFS-snapshot technique
 - AMFID dylib-less patch technique by Ian Beer reworked with the patch code from Electra's amfid_payload (stek29 & coolstar)
+- rootless-hsp4 idea by Ian Beer. Implemented on his updated async_wake exploit
 - Symbol finding by me ;) https://github.com/jakeajames/kernelSymbolFinder
 - The rest of patches are fairly simple and shouldn't be considered property of anyone in my opinion. Everyone who has enough knowledge can write them fairly easily
 
