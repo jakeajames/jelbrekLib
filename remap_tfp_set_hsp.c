@@ -33,7 +33,7 @@ uint64_t make_fake_task(uint64_t vm_map) {
 // in kernel_utils.h
 void MakePortFakeTaskPort(mach_port_t port, uint64_t task_kaddr);
 
-int setHGSP4() {
+int setHSP4() {
     // huge thanks to Siguza for hsp4 & v0rtex
     // for explainations and being a good rubber duck :p
 
@@ -169,4 +169,5 @@ int setHGSP4() {
 
     return 0;
 }
+
 

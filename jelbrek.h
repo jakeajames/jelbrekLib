@@ -212,6 +212,25 @@ uint64_t getVnodeAtPath(const char *path);
 
 /*
  Purpose:
+    Patch host type to make hgsp() work
+ Parameters:
+    host port. mach_host_self() for the host port of this process
+ Return value:
+    YES: Success or already good
+    NO: Failure
+ 
+ WARNING:
+    DO **NOT** USE WITH mach_host_self() ON A PROCESS THAT WAS MEANT TO RUN AS "mobile" (ANY app),
+    ON A DEVICE WITH SENSTIVE INFORMATION OR IN A NON-DEVELOPER JAILBREAK
+    THAT IN COMBINATION WITH setHSP4() WILL GIVE ANY APP THE ABILITY TO GET THE KERNEL TASK, FULL CONTROL OF YOUR DEVICE
+ 
+    On a developer device, you can do that and will probably be very helpful for debugging :)
+    The original idea was implemented by Ian Beer. Another example of this patch can be found inside FakeHostPriv() which creates a dummy port which acts like mach_host_self() of a root process
+ */
+BOOL PatchHostPriv(mach_port_t host);
+
+/*
+ Purpose:
     Do a hex dump I guess
  Parameters:
     Address in kernel from where to get data

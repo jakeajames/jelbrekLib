@@ -4,6 +4,7 @@
 #import "offsetof.h"
 #import "offsets.h"
 #import "kexecute.h"
+#import "jelbrek.h"
 
 static mach_port_t tfpzero;
 
@@ -86,16 +87,14 @@ mach_port_t FakeHostPriv() {
     // get a send right
     mach_port_insert_right(mach_task_self(), port, port, MACH_MSG_TYPE_MAKE_SEND);
     
+    // make sure port type has IKOT_HOST_PRIV
+    PatchHostPriv(port);
+    
     // locate the port
     uint64_t port_addr = FindPortAddress(port);
-    
-    // change the type of the port
-#define IKOT_HOST_PRIV 4
-#define IO_ACTIVE   0x80000000
-    KernelWrite_32bits(port_addr + 0, IO_ACTIVE|IKOT_HOST_PRIV);
-    
+
     // change the space of the port
-    KernelWrite_64bits(port_addr + 0x60, IPCSpaceKernel());
+    KernelWrite_64bits(port_addr + _koffset(KSTRUCT_OFFSET_IPC_PORT_IP_RECEIVER), IPCSpaceKernel());
     
     // set the kobject
     KernelWrite_64bits(port_addr + off_ip_kobject, realhost);

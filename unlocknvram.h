@@ -1,2 +1,2 @@
-void unlocknvram(void);
-int locknvram(void);
+void UnlockNVRAM(void);
+int LockNVRAM(void);

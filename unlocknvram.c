@@ -48,7 +48,7 @@ uint64_t get_iodtnvram_obj(void) {
 
 uint64_t orig_vtable = -1;
 
-void unlocknvram(void) {
+void UnlockNVRAM(void) {
 
     uint64_t IODTNVRAMObj = get_iodtnvram_obj();
     if (IODTNVRAMObj == 0) {
@@ -84,7 +84,7 @@ void unlocknvram(void) {
     free(buf);
 }
 
-int locknvram(void) {
+int LockNVRAM(void) {
     if (orig_vtable == -1) {
         printf("[-] Trying to lock nvram, but didnt unlock first\n");
         return -1;

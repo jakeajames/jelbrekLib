@@ -142,13 +142,13 @@ void OSObject_Release(uint64_t osobject) {
 
 void OSObject_Retain(uint64_t osobject) {
     uint64_t vtab = KernelRead_64bits(osobject);
-    uint64_t f = KernelRead_64bits(vtab + off_OSObject_Release);
+    uint64_t f = KernelRead_64bits(vtab + off_OSObject_Retain);
     (void) Kernel_Execute(f, osobject, 0, 0, 0, 0, 0, 0);
 }
 
 uint32_t OSObject_GetRetainCount(uint64_t osobject) {
     uint64_t vtab = KernelRead_64bits(osobject);
-    uint64_t f = KernelRead_64bits(vtab + off_OSObject_Release);
+    uint64_t f = KernelRead_64bits(vtab + off_OSObject_GetRetainCount);
     return (uint32_t) Kernel_Execute(f, osobject, 0, 0, 0, 0, 0, 0);
 }
 

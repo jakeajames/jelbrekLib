@@ -8,5 +8,4 @@
 
 #include <mach/mach.h>
 
-int setHGSP4(void);
-
+int setHSP4(void);

@@ -213,18 +213,37 @@ uint64_t find_symbol(const char *symbol, bool verbose); //powered by kernelSymbo
 
 /*
  Purpose:
-    Remap tfp0 as host_special_port 4
+    Remap tfp0 as host special port 4
  Return value:
     1: Error
     0: Success
 */
-int setHGSP4(void);
+int setHSP4(void);
+
+/*
+ Purpose:
+    Patch host type to make hgsp() work
+ Parameters:
+    host port. mach_host_self() for the host port of this process
+ Return value:
+    YES: Success or already good
+    NO: Failure
+ 
+ WARNING:
+    DO **NOT** USE WITH mach_host_self() ON A PROCESS THAT WAS MEANT TO RUN AS "mobile" (ANY app),
+    ON A DEVICE WITH SENSTIVE INFORMATION OR IN A NON-DEVELOPER JAILBREAK
+    THAT IN COMBINATION WITH setHSP4() WILL GIVE ANY APP THE ABILITY TO GET THE KERNEL TASK, FULL CONTROL OF YOUR DEVICE
+ 
+    On a developer device, you can do that and will probably be very helpful for debugging :)
+    The original idea was implemented by Ian Beer. Another example of this patch can be found inside FakeHostPriv() which creates a dummy port which acts like mach_host_self() of a root process
+ */
+BOOL PatchHostPriv(mach_port_t host);
 
 /*
  Purpose:
     Unlock nvram memory
  */
-void unlocknvram(void);
+void UnlockNVRAM(void);
 
 /*
  Purpose:
@@ -233,11 +252,11 @@ void unlocknvram(void);
     -1: Error
      0: Success
  */
-int locknvram(void);
+int LockNVRAM(void);
 
 /*
  Purpose:
-    Find kernel base
+    Brute force KASLR and find kernel base
  Return value:
     Kernel base?
  */

