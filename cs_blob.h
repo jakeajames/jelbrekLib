@@ -115,3 +115,60 @@ static const uint32_t hashPriorities[] = {
     CS_HASHTYPE_SHA256,
     CS_HASHTYPE_SHA384,
 };
+
+typedef struct __SC_GenericBlob {
+    uint32_t magic;                    /* magic number */
+    uint32_t length;                /* total length of blob */
+    char data[];
+} CS_GenericBlob;
+
+/*
+ * C form of a CodeDirectory.
+ */
+typedef struct __CodeDirectory {
+    uint32_t magic;                    /* magic number (CSMAGIC_CODEDIRECTORY) */
+    uint32_t length;                /* total length of CodeDirectory blob */
+    uint32_t version;                /* compatibility version */
+    uint32_t flags;                    /* setup and mode flags */
+    uint32_t hashOffset;            /* offset of hash slot element at index zero */
+    uint32_t identOffset;            /* offset of identifier string */
+    uint32_t nSpecialSlots;            /* number of special hash slots */
+    uint32_t nCodeSlots;            /* number of ordinary (code) hash slots */
+    uint32_t codeLimit;                /* limit to main image signature range */
+    uint8_t hashSize;                /* size of each hash in bytes */
+    uint8_t hashType;                /* type of hash (cdHashType* constants) */
+    uint8_t spare1;                    /* unused (must be zero) */
+    uint8_t    pageSize;                /* log2(page size in bytes); 0 => infinite */
+    uint32_t spare2;                /* unused (must be zero) */
+    /* followed by dynamic content as located by offset fields above */
+} CS_CodeDirectory;
+
+#define CS_OPS_ENTITLEMENTS_BLOB 7    /* get entitlements blob */
+int csops(pid_t pid, unsigned int ops, void *useraddr, size_t usersize);
+
+struct cs_blob {
+    struct cs_blob    *csb_next;
+    cpu_type_t    csb_cpu_type;
+    unsigned int    csb_flags;
+    off_t        csb_base_offset;    /* Offset of Mach-O binary in fat binary */
+    off_t        csb_start_offset;    /* Blob coverage area start, from csb_base_offset */
+    off_t        csb_end_offset;        /* Blob coverage area end, from csb_base_offset */
+    vm_size_t    csb_mem_size;
+    vm_offset_t    csb_mem_offset;
+    vm_address_t    csb_mem_kaddr;
+    unsigned char    csb_cdhash[CS_CDHASH_LEN];
+    const struct cs_hash  *csb_hashtype;
+    vm_size_t    csb_hash_pagesize;    /* each hash entry represent this many bytes in the file */
+    vm_size_t    csb_hash_pagemask;
+    vm_size_t    csb_hash_pageshift;
+    vm_size_t    csb_hash_firstlevel_pagesize;    /* First hash this many bytes, then hash the hashes together */
+    const CS_CodeDirectory *csb_cd;
+    const char     *csb_teamid;
+    const CS_GenericBlob *csb_entitlements_blob;    /* raw blob, subrange of csb_mem_kaddr */
+    void *          csb_entitlements;    /* The entitlements as an OSDictionary */
+    unsigned int    csb_signer_type;
+    
+    /* The following two will be replaced by the csb_signer_type. */
+    unsigned int    csb_platform_binary:1;
+    unsigned int    csb_platform_path:1;
+};

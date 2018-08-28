@@ -259,15 +259,37 @@ int trustbin(const char *path) {
     return 0;
 }
 
-BOOL unsandbox(pid_t pid) {
+uint64_t unsandbox(pid_t pid) {
+    if (!pid) return NO;
+    
+    printf("[*] Unsandboxing pid %d\n", pid);
+    
     uint64_t proc = proc_of_pid(pid); // pid's proccess structure on the kernel
     uint64_t ucred = KernelRead_64bits(proc + off_p_ucred); // pid credentials
-    KernelWrite_64bits(KernelRead_64bits(ucred + off_ucred_cr_label /* MAC label */) + off_sandbox_slot /* First slot is AMFI's. so, this is second? */, 0); //get rid of sandbox by nullifying it
+    uint64_t cr_label = KernelRead_64bits(ucred + off_ucred_cr_label); // MAC label
+    uint64_t orig_sb = KernelRead_64bits(cr_label + off_sandbox_slot);
     
-    return (KernelRead_64bits(KernelRead_64bits(ucred + off_ucred_cr_label) + off_sandbox_slot) == 0) ? YES : NO;
+    KernelWrite_64bits(cr_label + off_sandbox_slot /* First slot is AMFI's. so, this is second? */, 0); //get rid of sandbox by nullifying it
+    
+    return (KernelRead_64bits(KernelRead_64bits(ucred + off_ucred_cr_label) + off_sandbox_slot) == 0) ? orig_sb : NO;
+}
+
+BOOL sandbox(pid_t pid, uint64_t sb) {
+    if (!pid) return NO;
+    
+    printf("[*] Sandboxing pid %d with slot at 0x%llx\n", pid, sb);
+    
+    uint64_t proc = proc_of_pid(pid); // pid's proccess structure on the kernel
+    uint64_t ucred = KernelRead_64bits(proc + off_p_ucred); // pid credentials
+    uint64_t cr_label = KernelRead_64bits(ucred + off_ucred_cr_label /* MAC label */);
+    KernelWrite_64bits(cr_label + off_sandbox_slot /* First slot is AMFI's. so, this is second? */, sb);
+    
+    return (KernelRead_64bits(KernelRead_64bits(ucred + off_ucred_cr_label) + off_sandbox_slot) == sb) ? YES : NO;
 }
 
 BOOL setcsflags(pid_t pid) {
+    if (!pid) return NO;
+    
     uint64_t proc = proc_of_pid(pid);
     uint32_t csflags = KernelRead_32bits(proc + off_p_csflags);
     uint32_t newflags = (csflags | CS_PLATFORM_BINARY | CS_INSTALLER | CS_GET_TASK_ALLOW | CS_DEBUGGED) & ~(CS_RESTRICT | CS_HARD | CS_KILL);
@@ -277,6 +299,8 @@ BOOL setcsflags(pid_t pid) {
 }
 
 BOOL rootify(pid_t pid) {
+    if (!pid) return NO;
+    
     uint64_t proc = proc_of_pid(pid);
     uint64_t ucred = KernelRead_64bits(proc + off_p_ucred);
     //make everything 0 without setuid(0), pretty straightforward.
@@ -296,6 +320,8 @@ BOOL rootify(pid_t pid) {
 }
 
 void platformize(pid_t pid) {
+    if (!pid) return;
+    
     uint64_t proc = proc_of_pid(pid);
     uint64_t task = KernelRead_64bits(proc + off_task);
     uint32_t t_flags = KernelRead_32bits(task + off_t_flags);
@@ -305,10 +331,14 @@ void platformize(pid_t pid) {
     KernelWrite_32bits(proc + off_p_csflags, csflags | 0x24004001u); //patch csflags
 }
 
-BOOL entitlePid(pid_t pid, const char *ent, BOOL val) {
+BOOL entitlePidOnAMFI(pid_t pid, const char *ent, BOOL val) {
+    
+    if (!pid) return NO;
+    
     uint64_t proc = proc_of_pid(pid);
     uint64_t ucred = KernelRead_64bits(proc + off_p_ucred);
-    uint64_t entitlements = KernelRead_64bits(KernelRead_64bits(ucred + off_ucred_cr_label) + off_amfi_slot);
+    uint64_t cr_label = KernelRead_64bits(ucred + off_ucred_cr_label);
+    uint64_t entitlements = KernelRead_64bits(cr_label + off_amfi_slot);
     
     if (OSDictionary_GetItem(entitlements, ent) == 0) {
         printf("[*] Setting Entitlements...\n");
@@ -323,6 +353,146 @@ BOOL entitlePid(pid_t pid, const char *ent, BOOL val) {
         return (entval) ? YES : NO;
     }
     return YES;
+}
+
+BOOL patchEntitlements(pid_t pid, const char *entitlementString) {
+    
+    if (!pid) return NO;
+    
+#define SWAP32(val) __builtin_bswap32(val)
+    
+    struct cs_blob *csblob = malloc(sizeof(struct cs_blob));
+    CS_CodeDirectory *code_dir = malloc(sizeof(CS_CodeDirectory));
+    CS_GenericBlob *blob = malloc(sizeof(CS_GenericBlob));
+    
+    // our codesign blobs can be found at our vnode -> ubcinfo -> csblobs
+    uint64_t proc = proc_of_pid(pid);
+    uint64_t vnode = KernelRead_64bits(proc + off_p_textvp);
+    uint64_t ubc_info = KernelRead_64bits(vnode + off_v_ubcinfo);
+    uint64_t cs_blobs = KernelRead_64bits(ubc_info + off_ubcinfo_csblobs);
+    
+    // read from there into the csblob struct
+    KernelRead(cs_blobs, csblob, sizeof(struct cs_blob));
+    
+    uint64_t codeDirAddr = (uint64_t) csblob->csb_cd;
+    uint64_t entBlobAddr = (uint64_t) csblob->csb_entitlements_blob;
+    
+    printf("[entitlePid][*] Code directory at 0x%llx\n", codeDirAddr);
+    printf("[entitlePid][*] Blob at 0x%llx\n", entBlobAddr);
+    
+    // read into the code directory struct
+    KernelRead(codeDirAddr, code_dir, sizeof(CS_CodeDirectory));
+    if (SWAP32(code_dir->magic) != CSMAGIC_CODEDIRECTORY) {
+        printf("[entitlePid] Wrong magic! 0x%x != 0x%x\n", code_dir->magic, CSMAGIC_CODEDIRECTORY);
+        return NO;
+    }
+    
+    // get length of our current blob
+    // we use SWAP32 to convert big endian into little endian
+    uint32_t length = SWAP32(KernelRead_32bits(entBlobAddr + offsetof(CS_GenericBlob, length)));
+    if (length < 8) {
+        printf("[entitlePid] Blob too small!\n");
+        return NO;
+    }
+    
+    printf("[entitlePid][*] length = %d\n", length);
+    
+    // allocate space for our new blob
+    blob = malloc(length);
+    
+    // read that much data into the CS_GenericBlob struct
+    KernelRead(entBlobAddr, blob, length);
+    
+    // hugely experimental
+    if (strlen(entitlementString) + strlen("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n\n</dict>\n</plist>\n") > strlen(blob->data)) {
+        //printf("[entitlePid] Sorry! You can't make the codesigning blob bigger! You have room for %lu bytes (including plist stuff)\n", strlen(blob->data));
+        printf("[*] Blob is bigger than what we have, getting more room\n");
+        
+        // calculate new length
+        uint32_t newLength = (uint32_t) strlen(entitlementString) + strlen("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n\n</dict>\n</plist>\n") + 8; // sizeof(magic) + sizeof(length) = 8 bytes
+        
+        // add more space here
+        blob = realloc(blob, newLength);
+        // update length; BIG ENDIAN
+        blob->length = SWAP32(newLength);
+        // add more space on kernel too
+        entBlobAddr = Kernel_alloc(newLength);
+        // add old blob on new address
+        KernelWrite(entBlobAddr, blob, length);
+        // update address
+        csblob->csb_entitlements_blob = (const CS_GenericBlob *)entBlobAddr;
+        KernelWrite(cs_blobs, csblob, sizeof(struct cs_blob));
+        // update hash
+        unsigned char newHash[32];
+        CC_SHA256(blob, length, newHash);
+        KernelWrite(codeDirAddr + SWAP32(code_dir->hashOffset) - CSSLOT_ENTITLEMENTS * code_dir->hashSize, newHash, sizeof(newHash));
+    }
+    
+    unsigned char entHash[32];
+    unsigned char digest[32];
+    
+    // make sure actual SHA256 hash of the blob matches the one on the code directory
+    KernelRead(codeDirAddr + SWAP32(code_dir->hashOffset) - CSSLOT_ENTITLEMENTS * code_dir->hashSize, entHash, sizeof(entHash));
+    CC_SHA256(blob, length, digest);
+    if (memcmp(entHash, digest, sizeof(digest))) {
+        printf("[entitlePid] Hash doesn't match?\n");
+        free(blob);
+        return NO;
+    }
+    
+    // add our new entitlements
+    sprintf(blob->data,
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+            "<plist version=\"1.0\">\n"
+            "<dict>\n%s\n</dict>\n"
+            "</plist>\n", entitlementString);
+    
+    // calculate the SHA256
+    CC_SHA256(blob, length, digest);
+    
+    // write our new hash
+    KernelWrite(codeDirAddr + SWAP32(code_dir->hashOffset) - CSSLOT_ENTITLEMENTS * code_dir->hashSize, digest, sizeof(digest));
+    // write our new blob
+    KernelWrite(entBlobAddr, blob, length);
+
+    bzero(blob, sizeof(CS_GenericBlob));
+    
+    // check if the entitlements are there
+    int rv = csops(pid, CS_OPS_ENTITLEMENTS_BLOB, blob, length);
+    if (rv) {
+        printf("[entitlePid] Failed setting entitlements!\n");
+        free(blob);
+        return NO;
+    } else {
+        printf("[entitlePid] Set entitlements!\n\tNew blob: \n%s\n", blob->data);
+    }
+    
+    // now time to patch ents on AMFI too
+    uint64_t ucred = KernelRead_64bits(proc + off_p_ucred);
+    uint64_t cr_label = KernelRead_64bits(ucred + off_ucred_cr_label);
+    uint64_t entitlements = KernelRead_64bits(cr_label + off_amfi_slot);
+    
+    // unserialize that plist
+    // AMFI requires unserialized entitlements
+    uint64_t newEntitlements = OSUnserializeXML(blob->data);
+    
+    if (!newEntitlements) {
+        printf("[-] Error unserializing ents\n %s\n", blob->data);
+        free(blob);
+        return NO;
+    }
+    printf("[i] New ents at 0x%llx\n", newEntitlements);
+    
+    printf("[*] Patching Entitlements on AMFI...\n");
+    printf("[i] before: ents at 0x%llx\n", entitlements);
+    
+    KernelWrite_64bits(cr_label + off_amfi_slot, newEntitlements);
+    entitlements = KernelRead_64bits(cr_label + off_amfi_slot);
+    
+    printf("[i] after: ents at 0x%llx\n", entitlements);
+    
+    free(blob);
+    return (entitlements == newEntitlements) ? YES : NO;
 }
 
 uint64_t borrowCredsFromPid(pid_t target, pid_t donor) {
@@ -394,8 +564,7 @@ int launch(char *binary, char *arg1, char *arg2, char *arg3, char *arg4, char *a
 }
 
 BOOL remount1126() {
-    uint64_t _rootvnode = getVnodeAtPath("/");
-    uint64_t rootfs_vnode = KernelRead_64bits(_rootvnode);
+    uint64_t rootfs_vnode = getVnodeAtPath("/");
     printf("\n[*] vnode of /: 0x%llx\n", rootfs_vnode);
     uint64_t v_mount = KernelRead_64bits(rootfs_vnode + off_v_mount);
     uint32_t v_flag = KernelRead_32bits(v_mount + off_mnt_flag);
@@ -435,7 +604,7 @@ int mountDevAtPathAsRW(const char* devpath, const char* path) {
     gettimeofday(NULL, &mntargs.hfs_timezone);
     
     int rvtmp = mount("apfs", path, 0, (void *)&mntargs);
-    printf("mounting: %d\n", rvtmp);
+    printf("[*] mounting: %d\n", rvtmp);
     return rvtmp;
 }
 
@@ -572,3 +741,7 @@ BOOL PatchHostPriv(mach_port_t host) {
     
     return ((IO_ACTIVE | IKOT_HOST_PRIV) == new) ? YES : NO;
 }
+
+/*int addSandboxExtension() {
+ 
+}*/

@@ -39,6 +39,7 @@ void Kernel_memcpy(uint64_t dest, uint64_t src, uint32_t length);
 void Kernel_free(mach_vm_address_t address, vm_size_t size);
 uint64_t Kernel_alloc(vm_size_t size);
 uint64_t Kernel_alloc_wired(uint64_t size);
+int Kernel_strcmp(uint64_t kstr, const char* str);
 
 // for messing with processes
 uint64_t proc_of_pid(pid_t pid);

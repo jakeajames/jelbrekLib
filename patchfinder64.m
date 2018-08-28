@@ -961,3 +961,17 @@ addr_t Find_smalloc() {
     return start + KernDumpBase;
 }
 
+addr_t sbops() {
+    addr_t off, what;
+    uint8_t *str = Boyermoore_horspool_memmem(Kernel + PString_base, PString_size, (uint8_t *)"Seatbelt sandbox policy", sizeof("Seatbelt sandbox policy") - 1);
+    if (!str) {
+        return 0;
+    }
+    what = str - Kernel + KernDumpBase;
+    for (off = 0; off < Kernel_size - Prelink_Base; off += 8) {
+        if (*(uint64_t *)(Kernel + Prelink_Base + off) == what) {
+            return *(uint64_t *)(Kernel + Prelink_Base + off + 24);
+        }
+    }
+    return 0;
+}

@@ -191,7 +191,7 @@ uint64_t patchAMFID() {
     
     // allow us to get amfid's task
     // task_for_pid_in_kernel kinda works but execution gets stuck
-    entitlePid(amfid_pid, "get-task-allow", YES);
+    entitlePidOnAMFI(amfid_pid, "get-task-allow", YES);
     setcsflags(amfid_pid);
     
     printf("[*] Getting task port\n");

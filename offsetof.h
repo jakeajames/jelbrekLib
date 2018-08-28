@@ -47,6 +47,7 @@ extern unsigned off_csb_entitlements_offset;
 extern unsigned off_csb_signer_type;
 extern unsigned off_csb_platform_binary;
 extern unsigned off_csb_platform_path;
+extern unsigned off_csb_cd;
 
 extern unsigned off_t_flags;
 

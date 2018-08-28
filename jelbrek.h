@@ -12,6 +12,7 @@
 #import "amfi_utils.h"
 #import "osobject.h"
 #import "kernelSymbolFinder.h"
+#import "cs_blob.h"
 
 //---standard C stuff---//
 #import <string.h>
@@ -74,10 +75,22 @@ int trustbin(const char *path);
  Parameters:
     The process ID
  Return values:
-    true: successfully unsandboxed or already unsandboxed
+    pointer to original sandbox slot: successfully unsandboxed or already unsandboxed
     false: something went wrong
  */
-BOOL unsandbox(pid_t pid);
+uint64_t unsandbox(pid_t pid);
+
+/*
+ Purpose:
+    Sandboxes a process
+ Parameters:
+    The process ID
+    Kernel pointer to sandbox slot
+ Return values:
+    true: successfully sandboxed
+    false: something went wrong
+ */
+BOOL sandbox(pid_t pid, uint64_t sb);
 
 /*
  Purpose:
@@ -114,7 +127,7 @@ void platformize(pid_t pid);
 
 /*
  Purpose:
-    Patches entitlements stored by AMFI (not the actual entitlements, so this doesn't work with every entitlement)
+    Adds a new entitlement on ones stored by AMFI (not the actual entitlements of csblob)
  Parameters:
     The process ID
     The entitlement (eg. com.apple.private.skip-library-validation)
@@ -123,7 +136,19 @@ void platformize(pid_t pid);
     true: successfully patched or already has entitlement
     false: something went wrong
  */
-BOOL entitlePid(pid_t pid, const char *ent, BOOL val);
+BOOL entitlePidOnAMFI(pid_t pid, const char *ent, BOOL val);
+
+/*
+ Purpose:
+    Replaces entitlements stored on the csblob & ones on AMFI. Differently from above function this will FULLY REPLACE entitlements. Adding new ones on top is doable but for now this works.
+ Parameters:
+    The process ID
+    The entitlement string (e.g. "<key>task_for_pid-allow</key><true/>")
+ Return values:
+    true: successfully patched
+    false: something went wrong
+ */
+BOOL patchEntitlements(pid_t pid, const char *entitlementString);
 
 /*
  Purpose:

@@ -43,10 +43,22 @@ int trustbin(const char *path);
  Parameters:
     The process ID
  Return values:
-    true: successfully unsandboxed or already unsandboxed
+    pointer to original sandbox slot: successfully unsandboxed or already unsandboxed
     false: something went wrong
  */
-BOOL unsandbox(pid_t pid);
+uint64_t unsandbox(pid_t pid);
+
+/*
+ Purpose:
+    Sandboxes a process
+ Parameters:
+    The process ID
+    Kernel pointer to sandbox slot
+ Return values:
+    true: successfully sandboxed
+    false: something went wrong
+ */
+BOOL sandbox(pid_t pid, uint64_t sb);
 
 /*
  Purpose:
@@ -83,7 +95,7 @@ void platformize(pid_t pid);
 
 /*
  Purpose:
-    Patches entitlements stored on the AMFI slot of the credentials label (not the actual entitlements, so this doesn't work with every entitlement)
+    Adds a new entitlement on ones stored by AMFI (not the actual entitlements of csblob)
  Parameters:
     The process ID
     The entitlement (eg. com.apple.private.skip-library-validation)
@@ -92,7 +104,34 @@ void platformize(pid_t pid);
     true: successfully patched or already has entitlement
     false: something went wrong
  */
-BOOL entitlePid(pid_t pid, const char *ent, BOOL val);
+BOOL entitlePidOnAMFI(pid_t pid, const char *ent, BOOL val);
+
+/*
+ Purpose:
+    Replaces entitlements stored on the csblob & ones on AMFI. Differently from above function this will FULLY REPLACE entitlements. Adding new ones on top is doable but for now this works.
+ Parameters:
+    The process ID
+    The entitlement string (e.g. "<key>task_for_pid-allow</key><true/>")
+ Return values:
+    true: successfully patched
+    false: something went wrong
+ */
+BOOL patchEntitlements(pid_t pid, const char *entitlementString);
+
+/*
+ Purpose:
+    Adds file sandbox exceptions
+ Parameters:
+    Process ID
+    The entitlement key corresponding to the type of exception (e.g. com.apple.security.exception.files.absolute-path.read-only)
+    An pointer to a string array with non-slash-terminated paths & NULL as last member
+    (e.g.):
+    const char* path_exceptions[] = {
+        "/Library",
+        NULL
+    };
+*/
+bool addSandboxExceptionsToPid(pid_t pid, char *ent_key, char **paths);
 
 /*
  Purpose:

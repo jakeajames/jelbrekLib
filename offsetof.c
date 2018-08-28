@@ -41,10 +41,11 @@ unsigned off_ubcinfo_csblobs = 0x50;     // ubc_info::csblobs
 unsigned off_csb_cputype = 0x8;          // cs_blob::csb_cputype
 unsigned off_csb_flags = 0x12;           // cs_blob::csb_flags
 unsigned off_csb_base_offset = 0x16;     // cs_blob::csb_base_offset
-unsigned off_csb_entitlements_offset = 0x98; // cs_blob::csb_entitlements
+unsigned off_csb_entitlements_offset = 0x90; // cs_blob::csb_entitlements
 unsigned off_csb_signer_type = 0xA0;     // cs_blob::csb_signer_type
 unsigned off_csb_platform_binary = 0xA4; // cs_blob::csb_platform_binary
 unsigned off_csb_platform_path = 0xA8;   // cs_blob::csb_platform_path
+unsigned off_csb_cd = 0x80;              // cs_blob::csb_cd
 
 unsigned off_t_flags = 0x3a0; // task::t_flags
 
