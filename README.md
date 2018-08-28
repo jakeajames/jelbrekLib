@@ -29,7 +29,9 @@ h
 - pwn20wnd for the implementation of the rename-APFS-snapshot technique
 - AMFID dylib-less patch technique by Ian Beer reworked with the patch code from Electra's amfid_payload (stek29 & coolstar)
 - rootless-hsp4 idea by Ian Beer. Implemented on his updated async_wake exploit
-- Symbol finding by me ;) https://github.com/jakeajames/kernelSymbolFinder
+- Sandbox exceptions by stek29 (https://stek29.rocks/2018/01/26/sandbox.html)
+- CSBlob patching with stuff from Jonathan Levin and xerub
+- Symbol finding by me ;) (https://github.com/jakeajames/kernelSymbolFinder)
 - The rest of patches are fairly simple and shouldn't be considered property of anyone in my opinion. Everyone who has enough knowledge can write them fairly easily
 
 And, don't forget to tell me if I forgot to credit anyone!
