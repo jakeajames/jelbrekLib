@@ -975,3 +975,73 @@ addr_t sbops() {
     }
     return 0;
 }
+
+uint64_t find_bootargs(void) {
+    
+    /*
+     ADRP            X8, #_PE_state@PAGE
+     ADD             X8, X8, #_PE_state@PAGEOFF
+     LDR             X8, [X8,#(PE_state__boot_args - 0xFFFFFFF0078BF098)]
+     ADD             X8, X8, #0x6C
+     STR             X8, [SP,#0x550+var_550]
+     ADRP            X0, #aBsdInitCannotF@PAGE ; "\"bsd_init: cannot find root vnode: %s"...
+     ADD             X0, X0, #aBsdInitCannotF@PAGEOFF ; "\"bsd_init: cannot find root vnode: %s"...
+     BL              _panic
+     */
+    
+    addr_t ref = Find_strref("\"bsd_init: cannot find root vnode: %s\"", 1, 0);
+    
+    if (ref == 0) {
+        return 0;
+    }
+    
+    ref -= KernDumpBase;
+    // skip add & adrp for panic str
+    ref -= 8;
+    uint32_t *insn = (uint32_t*)(Kernel+ref);
+    
+    // skip str
+    --insn;
+    // add xX, xX, #cmdline_offset
+    uint8_t xm = *insn&0x1f;
+    if (((*insn>>5)&0x1f) != xm || ((*insn>>22)&3) != 0) {
+        return 0;
+    }
+    
+    //cmdline_offset = (*insn>>10) & 0xfff;
+    
+    uint64_t val = KernDumpBase;
+    
+    --insn;
+    // ldr xX, [xX, #(PE_state__boot_args - PE_state)]
+    if ((*insn & 0xF9C00000) != 0xF9400000) {
+        return 0;
+    }
+    // xd == xX, xn == xX,
+    if ((*insn&0x1f) != xm || ((*insn>>5)&0x1f) != xm) {
+        return 0;
+    }
+    
+    val += ((*insn >> 10) & 0xFFF) << 3;
+    
+    --insn;
+    // add xX, xX, #_PE_state@PAGEOFF
+    if ((*insn&0x1f) != xm || ((*insn>>5)&0x1f) != xm || ((*insn>>22)&3) != 0) {
+        return 0;
+    }
+    
+    val += (*insn>>10) & 0xfff;
+    
+    --insn;
+    if ((*insn & 0x1f) != xm) {
+        return 0;
+    }
+    
+    // pc
+    val += ((uint8_t*)(insn) - Kernel) & ~0xfff;
+    
+    // don't ask, I wrote this at 5am
+    val += (*insn<<9 & 0x1ffffc000) | (*insn>>17 & 0x3000);
+    
+    return val;
+}

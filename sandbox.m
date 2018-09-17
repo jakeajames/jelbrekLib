@@ -248,6 +248,7 @@ bool addSandboxExceptionsToPid(pid_t pid, char *ent_key, char **paths) {
     while (*paths) {
         if (hasFileExtension(sandbox, *paths, ent_key)) {
             printf("[sbex][i] Pid %d already has '%s', skipping\n", pid, *paths);
+            ++paths;
             continue;
         }
         
@@ -263,6 +264,8 @@ bool addSandboxExceptionsToPid(pid_t pid, char *ent_key, char **paths) {
         printf("[sbex][i] Adding exceptions on pid %d's sandbox\n", pid);
         extension_add(ext, sandbox, ent_key);
     }
-
+    if (hasFileExtension(sandbox, "/Library", ent_key)) {
+        printf("[sbex][i] Pid %d already has '%s', skipping\n", pid, "/Library");
+    }
     return (ext != 0);
 }

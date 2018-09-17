@@ -17,7 +17,7 @@
 extern uint64_t KASLR_Slide;
 
 int vnode_lookup(const char *path, int flags, uint64_t *vnode, uint64_t vfs_context) {
-
+    
     size_t len = strlen(path) + 1;
     uint64_t ptr = Kernel_alloc(8);
     uint64_t ptr2 = Kernel_alloc(len);

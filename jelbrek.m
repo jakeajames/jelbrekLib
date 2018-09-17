@@ -26,7 +26,7 @@ int init_jelbrek(mach_port_t tfpzero) {
             printf("[-] failed to find kernel base\n");
             return 2; //theoretically this can never happen but meh
         }
-        KASLR_Slide = KernelBase - 0xFFFFFFF007004000; // slid kernel base - kernel base = kaslr slide
+        KASLR_Slide = (uint32_t)(KernelBase - 0xFFFFFFF007004000); // slid kernel base - kernel base = kaslr slide
         
         int ret = InitPatchfinder(KernelBase, NULL); // patchfinder
         if (ret) {
@@ -295,7 +295,7 @@ BOOL setcsflags(pid_t pid) {
     uint32_t newflags = (csflags | CS_PLATFORM_BINARY | CS_INSTALLER | CS_GET_TASK_ALLOW | CS_DEBUGGED) & ~(CS_RESTRICT | CS_HARD | CS_KILL);
     KernelWrite_32bits(proc + off_p_csflags, newflags);
     
-    return (KernelRead_32bits(proc + off_p_csflags) == newflags) ? NO : YES;
+    return (KernelRead_32bits(proc + off_p_csflags) == newflags) ? YES : NO;
 }
 
 BOOL rootify(pid_t pid) {
@@ -363,7 +363,7 @@ BOOL patchEntitlements(pid_t pid, const char *entitlementString) {
     
     struct cs_blob *csblob = malloc(sizeof(struct cs_blob));
     CS_CodeDirectory *code_dir = malloc(sizeof(CS_CodeDirectory));
-    CS_GenericBlob *blob = malloc(sizeof(CS_GenericBlob));
+    CS_GenericBlob *blob;
     
     // our codesign blobs can be found at our vnode -> ubcinfo -> csblobs
     uint64_t proc = proc_of_pid(pid);
@@ -384,59 +384,96 @@ BOOL patchEntitlements(pid_t pid, const char *entitlementString) {
     KernelRead(codeDirAddr, code_dir, sizeof(CS_CodeDirectory));
     if (SWAP32(code_dir->magic) != CSMAGIC_CODEDIRECTORY) {
         printf("[entitlePid] Wrong magic! 0x%x != 0x%x\n", code_dir->magic, CSMAGIC_CODEDIRECTORY);
+        free(code_dir);
+        free(csblob);
         return NO;
     }
     
     // get length of our current blob
-    // we use SWAP32 to convert big endian into little endian
+    // we use SWAP32 to convert big endian to little endian
     uint32_t length = SWAP32(KernelRead_32bits(entBlobAddr + offsetof(CS_GenericBlob, length)));
     if (length < 8) {
         printf("[entitlePid] Blob too small!\n");
+        free(code_dir);
+        free(csblob);
         return NO;
     }
     
     printf("[entitlePid][*] length = %d\n", length);
     
     // allocate space for our new blob
-    blob = malloc(length);
+    blob = malloc(sizeof(CS_GenericBlob));
+    
+    if (!blob) {
+        printf("[entitlePid][-] Ran out of memory? oops\n");
+        free(code_dir);
+        free(csblob);
+        return NO;
+    }
     
     // read that much data into the CS_GenericBlob struct
     KernelRead(entBlobAddr, blob, length);
     
-    // hugely experimental
-    if (strlen(entitlementString) + strlen("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n\n</dict>\n</plist>\n") > strlen(blob->data)) {
-        //printf("[entitlePid] Sorry! You can't make the codesigning blob bigger! You have room for %lu bytes (including plist stuff)\n", strlen(blob->data));
-        printf("[*] Blob is bigger than what we have, getting more room\n");
+    if (strlen(entitlementString) + strlen("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+                                           "<plist version=\"1.0\">\n"
+                                           "<dict>\n\n</dict>\n"
+                                           "</plist>\n") > strlen(blob->data)) {
+        printf("[entitlePid] Sorry! You can't make the codesigning blob bigger! You have room for %lu bytes (including plist stuff)\n", strlen(blob->data));
+        
+        free(code_dir);
+        free(csblob);
+        free(blob);
+        
+        return NO;
+        
+        // experimental
+        // this seems to work now
+        // but panic after some time after process quits
+        
+/*      printf("[entitlePid][*] Blob is bigger than what we have, getting more room\n");
         
         // calculate new length
-        uint32_t newLength = (uint32_t) strlen(entitlementString) + strlen("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n\n</dict>\n</plist>\n") + 8; // sizeof(magic) + sizeof(length) = 8 bytes
+        uint32_t newLength = (uint32_t)(4 + 4 + strlen(entitlementString) +
+        strlen("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+               "<plist version=\"1.0\">\n"
+               "<dict>\n\n</dict>\n"
+               "</plist>\n") + 1); // magic + length + data + null terminator
         
-        // add more space here
-        blob = realloc(blob, newLength);
         // update length; BIG ENDIAN
         blob->length = SWAP32(newLength);
-        // add more space on kernel too
+        
+        // add more space on kernel
         entBlobAddr = Kernel_alloc(newLength);
-        // add old blob on new address
+        Kernel_Execute(Find_bzero(), entBlobAddr, newLength, 0, 0, 0, 0, 0);
+        
+        // add old blob
         KernelWrite(entBlobAddr, blob, length);
+        
         // update address
         csblob->csb_entitlements_blob = (const CS_GenericBlob *)entBlobAddr;
         KernelWrite(cs_blobs, csblob, sizeof(struct cs_blob));
+        
         // update hash
-        unsigned char newHash[32];
-        CC_SHA256(blob, length, newHash);
+        uint8_t newHash[CC_SHA256_DIGEST_LENGTH];
+        CC_SHA256(blob, newLength, (unsigned char *)newHash);
         KernelWrite(codeDirAddr + SWAP32(code_dir->hashOffset) - CSSLOT_ENTITLEMENTS * code_dir->hashSize, newHash, sizeof(newHash));
+        
+        length = newLength;
+*/
     }
     
-    unsigned char entHash[32];
-    unsigned char digest[32];
+    uint8_t entHash[CC_SHA256_DIGEST_LENGTH];
+    uint8_t digest[CC_SHA256_DIGEST_LENGTH];
     
     // make sure actual SHA256 hash of the blob matches the one on the code directory
     KernelRead(codeDirAddr + SWAP32(code_dir->hashOffset) - CSSLOT_ENTITLEMENTS * code_dir->hashSize, entHash, sizeof(entHash));
     CC_SHA256(blob, length, digest);
+    
     if (memcmp(entHash, digest, sizeof(digest))) {
-        printf("[entitlePid] Hash doesn't match?\n");
+        printf("[entitlePid] Original hash doesn't match?\n");
         free(blob);
+        free(code_dir);
+        free(csblob);
         return NO;
     }
     
@@ -452,9 +489,14 @@ BOOL patchEntitlements(pid_t pid, const char *entitlementString) {
     
     // write our new hash
     KernelWrite(codeDirAddr + SWAP32(code_dir->hashOffset) - CSSLOT_ENTITLEMENTS * code_dir->hashSize, digest, sizeof(digest));
+    
+    free(code_dir);
+    
     // write our new blob
     KernelWrite(entBlobAddr, blob, length);
-
+  
+    //KernelWrite_64bits((uint64_t) csblob->csb_entitlements, OSUnserializeXML(blob->data));
+    
     bzero(blob, sizeof(CS_GenericBlob));
     
     // check if the entitlements are there
@@ -462,6 +504,7 @@ BOOL patchEntitlements(pid_t pid, const char *entitlementString) {
     if (rv) {
         printf("[entitlePid] Failed setting entitlements!\n");
         free(blob);
+        free(csblob);
         return NO;
     } else {
         printf("[entitlePid] Set entitlements!\n\tNew blob: \n%s\n", blob->data);
@@ -472,24 +515,28 @@ BOOL patchEntitlements(pid_t pid, const char *entitlementString) {
     uint64_t cr_label = KernelRead_64bits(ucred + off_ucred_cr_label);
     uint64_t entitlements = KernelRead_64bits(cr_label + off_amfi_slot);
     
-    // unserialize that plist
-    // AMFI requires unserialized entitlements
+    // Add unserialized entitlements to the AMFI slot
     uint64_t newEntitlements = OSUnserializeXML(blob->data);
     
+    printf("[entitlePid][+] Patching unserialized entitlements\n");
+    KernelWrite_64bits((uint64_t)csblob->csb_entitlements, newEntitlements);
+    free(csblob);
+    
     if (!newEntitlements) {
-        printf("[-] Error unserializing ents\n %s\n", blob->data);
+        printf("[entitlePid][-] Error unserializing ents\n %s\n", blob->data);
         free(blob);
         return NO;
     }
-    printf("[i] New ents at 0x%llx\n", newEntitlements);
     
-    printf("[*] Patching Entitlements on AMFI...\n");
-    printf("[i] before: ents at 0x%llx\n", entitlements);
+    printf("[entitlePid][i] New AMFI ents at 0x%llx\n", newEntitlements);
+    
+    printf("[entitlePid][*] Patching Entitlements on AMFI...\n");
+    printf("[entitlePid][i] before: ents at 0x%llx\n", entitlements);
     
     KernelWrite_64bits(cr_label + off_amfi_slot, newEntitlements);
     entitlements = KernelRead_64bits(cr_label + off_amfi_slot);
     
-    printf("[i] after: ents at 0x%llx\n", entitlements);
+    printf("[entitlePid][i] after: ents at 0x%llx\n", entitlements);
     
     free(blob);
     return (entitlements == newEntitlements) ? YES : NO;
