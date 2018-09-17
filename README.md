@@ -9,7 +9,7 @@ h
     
 # Setup
 
-- Compile OR ead over to https://github.com/jakeajames/jelbrekLib/tree/master/downloads and get everything there. 
+- Compile OR head over to https://github.com/jakeajames/jelbrekLib/tree/master/downloads and get everything there. 
 - Link with jelbrekLib.a & IOKit.tbd and include jelbrekLib.h
 - Call init_jelbrek() with tfp0 as your first thing and term_jelbrek() as your last
 
