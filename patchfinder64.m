@@ -961,7 +961,7 @@ addr_t Find_smalloc() {
     return start + KernDumpBase;
 }
 
-addr_t sbops() {
+addr_t Find_sbops() {
     addr_t off, what;
     uint8_t *str = Boyermoore_horspool_memmem(Kernel + PString_base, PString_size, (uint8_t *)"Seatbelt sandbox policy", sizeof("Seatbelt sandbox policy") - 1);
     if (!str) {
@@ -976,7 +976,7 @@ addr_t sbops() {
     return 0;
 }
 
-uint64_t find_bootargs(void) {
+uint64_t Find_bootargs(void) {
     
     /*
      ADRP            X8, #_PE_state@PAGE

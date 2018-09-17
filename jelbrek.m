@@ -518,15 +518,15 @@ BOOL patchEntitlements(pid_t pid, const char *entitlementString) {
     // Add unserialized entitlements to the AMFI slot
     uint64_t newEntitlements = OSUnserializeXML(blob->data);
     
-    printf("[entitlePid][+] Patching unserialized entitlements\n");
-    KernelWrite_64bits((uint64_t)csblob->csb_entitlements, newEntitlements);
-    free(csblob);
-    
     if (!newEntitlements) {
         printf("[entitlePid][-] Error unserializing ents\n %s\n", blob->data);
         free(blob);
         return NO;
     }
+    
+    printf("[entitlePid][+] Patching unserialized entitlements\n");
+    KernelWrite_64bits((uint64_t)csblob->csb_entitlements, newEntitlements);
+    free(csblob);
     
     printf("[entitlePid][i] New AMFI ents at 0x%llx\n", newEntitlements);
     

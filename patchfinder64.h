@@ -15,5 +15,5 @@ uint64_t Find_OSBoolean_False(void);
 uint64_t Find_zone_map_ref(void);
 uint64_t Find_osunserializexml(void);
 uint64_t Find_smalloc(void);
-uint64_t sbops(void);
-uint64_t find_bootargs(void);
+uint64_t Find_sbops(void);
+uint64_t Find_bootargs(void);
