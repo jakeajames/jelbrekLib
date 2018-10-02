@@ -189,7 +189,7 @@ int trustbin(const char *path) {
         
         rv = lstat(path, &st);
         if (rv || !S_ISREG(st.st_mode) || st.st_size < 0x4000) {
-            printf("[-] Binary too big\n");
+            printf("[-] Binary too small or not a regular file (symlink?)\n");
             return 3;
         }
         
