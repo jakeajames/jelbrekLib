@@ -35,6 +35,7 @@ unsigned off_sandbox_slot = 0x10;
 unsigned off_v_type = 0x70;              // vnode::v_type
 unsigned off_v_id = 0x74;                // vnode::v_id
 unsigned off_v_ubcinfo = 0x78;           // vnode::v_ubcinfo
+unsigned off_v_flags = 0x54;             // vnode::v_flags
 
 unsigned off_ubcinfo_csblobs = 0x50;     // ubc_info::csblobs
 

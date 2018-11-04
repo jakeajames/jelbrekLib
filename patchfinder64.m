@@ -879,6 +879,84 @@ addr_t Find_trustcache(void) {
     return Calc64(Kernel, call, call + 24, 21) + KernDumpBase;
 }
 
+// people that worked in unc0ver. sparkey maybe?
+addr_t Find_amficache() {
+    uint64_t cbz, call, func, val;
+    uint64_t ref = Find_strref("amfi_prevent_old_entitled_platform_binaries", 1, 1);
+    if (!ref) {
+        // iOS 11
+        ref = Find_strref("com.apple.MobileFileIntegrity", 0, 1);
+        if (!ref) {
+            return 0;
+        }
+        ref -= KernDumpBase;
+        call = Step64(Kernel, ref, 64, INSN_CALL);
+        if (!call) {
+            return 0;
+        }
+        call = Step64(Kernel, call + 4, 64, INSN_CALL);
+        goto okay;
+    }
+    ref -= KernDumpBase;
+    cbz = Step64(Kernel, ref, 32, INSN_CBZ);
+    if (!cbz) {
+        return 0;
+    }
+    call = Step64(Kernel, Follow_cbz(Kernel, cbz), 4, INSN_CALL);
+okay:
+    if (!call) {
+        return 0;
+    }
+    func = Follow_call64(Kernel, call);
+    if (!func) {
+        return 0;
+    }
+    val = Calc64(Kernel, func, func + 16, 8);
+    if (!val) {
+        ref = Find_strref("%s: only allowed process can check the trust cache", 1, 1); // Trying to find AppleMobileFileIntegrityUserClient::isCdhashInTrustCache
+        if (!ref) {
+            return 0;
+        }
+        ref -= KernDumpBase;
+        call = Step64_back(Kernel, ref, 11*4, INSN_CALL);
+        if (!call) {
+            return 0;
+        }
+        func = Follow_call64(Kernel, call);
+        if (!func) {
+            return 0;
+        }
+        call = Step64(Kernel, func, 8*4, INSN_CALL);
+        if (!call) {
+            return 0;
+        }
+        func = Follow_call64(Kernel, call);
+        if (!func) {
+            return 0;
+        }
+        call = Step64(Kernel, func, 8*4, INSN_CALL);
+        if (!call) {
+            return 0;
+        }
+        call = Step64(Kernel, call+4, 8*4, INSN_CALL);
+        if (!call) {
+            return 0;
+        }
+        func = Follow_call64(Kernel, call);
+        if (!func) {
+            return 0;
+        }
+        call = Step64(Kernel, func, 12*4, INSN_CALL);
+        if (!call) {
+            return 0;
+        }
+        
+        val = Calc64(Kernel, call, call + 6*4, 21);
+    }
+    return val + KernDumpBase;
+}
+
+
 addr_t Find_zone_map_ref(void) {
     // \"Nothing being freed to the zone_map. start = end = %p\\n\"
     uint64_t val = KernDumpBase;

@@ -37,6 +37,7 @@ extern unsigned off_sandbox_slot;
 extern unsigned off_v_type;
 extern unsigned off_v_id;
 extern unsigned off_v_ubcinfo;
+extern unsigned off_v_flags;
 
 extern unsigned off_ubcinfo_csblobs;
 

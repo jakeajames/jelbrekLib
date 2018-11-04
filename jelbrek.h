@@ -262,3 +262,25 @@ BOOL PatchHostPriv(mach_port_t host);
     Size of data to get
  */
 void HexDump(uint64_t addr, size_t size);
+
+/*
+ Purpose:
+    Make a path invisible
+ Parameters:
+    path
+ Return value:
+    true: Success
+    false: Failure
+ */
+BOOL hidePath(char *path);
+
+/*
+ Purpose:
+    Allow mmap of executable from every process with read access to it
+ Parameters:
+    path
+ Return value:
+    true: Success
+    false: Failure
+ */
+BOOL fixMmap(char *path);

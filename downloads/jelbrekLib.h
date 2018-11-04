@@ -330,6 +330,7 @@ uint64_t Find_bcopy(void);
 uint64_t Find_rootvnode(void);
 uint64_t Find_trustcache(void);
 uint64_t Find_amficache(void);
+uint64_t Find_amficache(void);
 uint64_t Find_OSBoolean_True(void);
 uint64_t Find_OSBoolean_False(void);
 uint64_t Find_zone_map_ref(void);
@@ -477,3 +478,25 @@ int setAmfidExceptionHandler(mach_port_t amfid_task_port, void *(exceptionHandle
     On success: Address to the original MISValidateSignatureAndCopyInfo of amfid
  */
 uint64_t patchAMFID(void);
+
+/*
+ Purpose:
+    Make a path invisible
+ Parameters:
+    path
+ Return value:
+    true: Success
+    false: Failure
+ */
+BOOL hidePath(char *path);
+
+/*
+ Purpose:
+    Allow mmap of executable from every process with read access to it
+ Parameters:
+    path
+ Return value:
+    true: Success
+    false: Failure
+ */
+BOOL fixMmap(char *path);

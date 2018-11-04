@@ -189,7 +189,7 @@ int trustbin(const char *path) {
         
         rv = lstat(path, &st);
         if (rv || !S_ISREG(st.st_mode) || st.st_size < 0x4000) {
-            printf("[-] Binary too small or not a regular file (symlink?)\n");
+            printf("[-] Binary too big\n");
             return 3;
         }
         
@@ -787,6 +787,44 @@ BOOL PatchHostPriv(mach_port_t host) {
     printf("[-] New host type: 0x%x\n", new);
     
     return ((IO_ACTIVE | IKOT_HOST_PRIV) == new) ? YES : NO;
+}
+
+BOOL hidePath(char *path) {
+    // for you all jailbreak-detection-ers
+    // your time is over
+    // say hello to this guy
+    
+#define VISSHADOW 0x008000
+    
+    uint64_t vnode = getVnodeAtPath(path);
+    if (vnode == -1) {
+        printf("[-] Unable to hide path: %s\n", path);
+        return NO;
+    }
+    uint32_t v_flags = KernelRead_32bits(vnode + off_v_flags);
+    KernelWrite_32bits(vnode + off_v_flags, v_flags | VISSHADOW);
+    
+    return ![[NSFileManager defaultManager] fileExistsAtPath:@(path)];
+}
+
+BOOL fixMmap(char *path) {
+    // for you all sandbox-blocked-mmap-ers
+    // it's your time to get freedom
+    // say hello to this guy
+    
+#define VSHARED_DYLD 0x000200
+    
+    uint64_t vnode = getVnodeAtPath(path);
+    if (vnode == -1) {
+        printf("[-] Unable to fix mmap of path: %s\n", path);
+        return NO;
+    }
+    uint32_t v_flags = KernelRead_32bits(vnode + off_v_flags);
+    KernelWrite_32bits(vnode + off_v_flags, v_flags | VSHARED_DYLD);
+    
+    vnode_put(vnode);
+    
+    return KernelRead_32bits(vnode + off_v_flags) & VSHARED_DYLD;
 }
 
 /*int addSandboxExtension() {
