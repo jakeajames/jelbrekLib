@@ -37,5 +37,5 @@ uint64_t get_vfs_context() {
 }
 
 int vnode_put(uint64_t vnode) {
-    return Kernel_Execute(find_symbol("_vnode_put", false) + KASLR_Slide, vnode, 0, 0, 0, 0, 0, 0);
+    return (int)Kernel_Execute(find_symbol("_vnode_put", false) + KASLR_Slide, vnode, 0, 0, 0, 0, 0, 0);
 }

@@ -834,6 +834,36 @@ uint64_t Find_rootvnode(void) {
     return val + KernDumpBase;
 }
 
+
+addr_t Find_vnode_lookup() {
+    addr_t call, bof;
+    addr_t ref = Find_strref("/private/var/mobile", 0, 0);
+    if (!ref) {
+        return 0;
+    }
+    ref -= KernDumpBase;
+    bof = BOF64(Kernel, XNUCore_Base, ref);
+    if (!bof) {
+        return 0;
+    }
+    call = Step64(Kernel, ref, ref - bof, INSN_CALL);
+    if (!call) {
+        return 0;
+    }
+    call += 4;
+    call = Step64(Kernel, call, call - bof, INSN_CALL);
+    if (!call) {
+        return 0;
+    }
+    call += 4;
+    call = Step64(Kernel, call, call - bof, INSN_CALL);
+    if (!call) {
+        return 0;
+    }
+    return Follow_call64(Kernel, call) + KernDumpBase;
+}
+
+
 //reversed from Electra
 //originally made by ninjaprawn
 
@@ -1123,3 +1153,4 @@ uint64_t Find_bootargs(void) {
     
     return val;
 }
+

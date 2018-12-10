@@ -3,9 +3,12 @@
 #import "patchfinder64.h"
 #import "offsetof.h"
 #import "offsets.h"
+#import "jelbrek.h"
 #import <sys/snapshot.h>
 #import <IOKit/IOKitLib.h>
 #import <stdlib.h>
+#import <signal.h>
+#import <sys/attr.h>
 
 int list_snapshots(const char *vol)
 {
@@ -107,3 +110,53 @@ int do_rename(const char *vol, const char *snap, const char *nw) {
     return (ret);
 }
 
+typedef struct val_attrs {
+    uint32_t          length;
+    attribute_set_t   returned;
+    attrreference_t   name_info;
+} val_attrs_t;
+
+int snapshot_check(const char *vol, const char *name)
+{
+    struct attrlist attr_list = { 0 };
+    
+    attr_list.commonattr = ATTR_BULK_REQUIRED;
+    
+    char *buf = (char*)calloc(2048, sizeof(char));
+    int retcount;
+    int fd = open(vol, O_RDONLY, 0);
+    while ((retcount = fs_snapshot_list(fd, &attr_list, buf, 2048, 0))>0) {
+        char *bufref = buf;
+        
+        for (int i=0; i<retcount; i++) {
+            val_attrs_t *entry = (val_attrs_t *)bufref;
+            if (entry->returned.commonattr & ATTR_CMN_NAME) {
+                printf("%s\n", (char*)(&entry->name_info) + entry->name_info.attr_dataoffset);
+                if (strstr((char*)(&entry->name_info) + entry->name_info.attr_dataoffset, name))
+                    return 1;
+            }
+            bufref += entry->length;
+        }
+    }
+    free(buf);
+    close(fd);
+    
+    if (retcount < 0) {
+        perror("fs_snapshot_list");
+        return -1;
+    }
+    
+    return 0;
+}
+
+int mountSnapshot(const char *vol, const char *name, const char *dir) {
+    int pd = launchSuspended("/sbin/mount_apfs", "-s", (char *)name, (char *)vol, (char *)dir, NULL, NULL, NULL);
+    
+    borrowCredsFromPid(pd, 0);
+    kill(pd, SIGCONT);
+    
+    int a;
+    if (pd != -1) waitpid(pd, &a, 0);
+    
+    return WEXITSTATUS(a);
+}

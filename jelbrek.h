@@ -168,7 +168,8 @@ uint64_t borrowCredsFromPid(pid_t target, pid_t donor);
     The target's process ID
     The donor binary path & up to 6 arguments (Leave NULL if not using)
  Return values:
-    Original credentials (use to revert later)
+    Success: Original credentials (use to revert later)
+    Error: posix_spawn return value
  */
 uint64_t borrowCredsFromDonor(pid_t target, char *binary, char *arg1, char *arg2, char *arg3, char *arg4, char *arg5, char *arg6, char**env);
 
@@ -189,7 +190,8 @@ void undoCredDonation(pid_t target, uint64_t origcred);
     Up to 6 arguments (Leave NULL if not using)
     environment variables (Leave NULL if not using)
  Return values:
-    posix_spawn's return value
+    Success: child exit status
+    Error: posix_spawn return value
  */
 int launchAsPlatform(char *binary, char *arg1, char *arg2, char *arg3, char *arg4, char *arg5, char *arg6, char**env);
 
@@ -201,9 +203,23 @@ int launchAsPlatform(char *binary, char *arg1, char *arg2, char *arg3, char *arg
     Up to 6 arguments (Leave NULL if not using)
     environment variables (Leave NULL if not using)
  Return values:
-    posix_spawn's'return value
+    Success: child exit status
+    Error: posix_spawn return value
  */
 int launch(char *binary, char *arg1, char *arg2, char *arg3, char *arg4, char *arg5, char *arg6, char**env);
+
+/*
+ Purpose:
+    Spawn a process suspended
+ Parameters:
+    Binary path
+    Up to 6 arguments (Leave NULL if not using)
+    environment variables (Leave NULL if not using)
+ Return values:
+    Success: child pid
+    Error: posix_spawn return value
+ */
+int launchSuspended(char *binary, char *arg1, char *arg2, char *arg3, char *arg4, char *arg5, char *arg6, char**env);
 
 /*
  Purpose:

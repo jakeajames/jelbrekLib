@@ -5,6 +5,8 @@ int list_snapshots(const char *vol);
 char *find_system_snapshot(void);
 int do_rename(const char *vol, const char *snap, const char *nw);
 char *copyBootHash(void);
+int snapshot_check(const char *vol, const char *name);
+int mountSnapshot(const char *vol, const char *name, const char *dir);
 
 struct hfs_mount_args {
     char    *fspec;            /* block special device to mount */

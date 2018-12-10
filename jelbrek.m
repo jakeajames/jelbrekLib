@@ -556,7 +556,8 @@ uint64_t borrowCredsFromDonor(pid_t target, char *binary, char *arg1, char *arg2
     pid_t pd;
     const char* args[] = {binary, arg1, arg2, arg3, arg4, arg5, arg6,  NULL};
     
-    posix_spawn(&pd, binary, NULL, NULL, (char **)&args, env);
+    int rv = posix_spawn(&pd, binary, NULL, NULL, (char **)&args, env);
+    if (rv) return rv;
     
     usleep(100);
     kill(pd, SIGSTOP); // suspend
@@ -585,17 +586,30 @@ int launchAsPlatform(char *binary, char *arg1, char *arg2, char *arg3, char *arg
     posix_spawnattr_setflags(&attr, POSIX_SPAWN_START_SUSPENDED); //this flag will make the created process stay frozen until we send the CONT signal. This so we can platformize it before it launches.
     
     int rv = posix_spawn(&pd, binary, NULL, &attr, (char **)&args, env);
+    if (rv) return rv;
     
     platformize(pd);
     
     kill(pd, SIGCONT); //continue
     
-    if (!rv) {
-        int a;
-        waitpid(pd, &a, 0);
-    }
+    int a = 0;
+    waitpid(pd, &a, 0);
     
-    return rv;
+    return WEXITSTATUS(a);
+}
+
+int launchSuspended(char *binary, char *arg1, char *arg2, char *arg3, char *arg4, char *arg5, char *arg6, char**env) {
+    pid_t pd;
+    const char* args[] = {binary, arg1, arg2, arg3, arg4, arg5, arg6,  NULL};
+    
+    posix_spawnattr_t attr;
+    posix_spawnattr_init(&attr);
+    posix_spawnattr_setflags(&attr, POSIX_SPAWN_START_SUSPENDED); //this flag will make the created process stay frozen until we send the CONT signal. This so we can platformize it before it launches.
+    
+    int rv = posix_spawn(&pd, binary, NULL, &attr, (char **)&args, env);
+    
+    if (rv) return rv;
+    else return pd;
 }
 
 int launch(char *binary, char *arg1, char *arg2, char *arg3, char *arg4, char *arg5, char *arg6, char**env) {
@@ -603,11 +617,12 @@ int launch(char *binary, char *arg1, char *arg2, char *arg3, char *arg4, char *a
     const char* args[] = {binary, arg1, arg2, arg3, arg4, arg5, arg6,  NULL};
     
     int rv = posix_spawn(&pd, binary, NULL, NULL, (char **)&args, env);
-    if (!rv) {
-        int a;
-        waitpid(pd, &a, 0);
-    }
-    return rv;
+    if (rv) return rv;
+    
+    int a = 0;
+    waitpid(pd, &a, 0);
+    
+    return WEXITSTATUS(a);
 }
 
 BOOL remount1126() {
