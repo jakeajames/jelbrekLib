@@ -277,7 +277,7 @@ uint64_t proc_of_procName(char *nm) {
     uint64_t proc = KernelRead_64bits(Find_allproc());
     char name[40] = {0};
     while (proc) {
-        KernelRead(proc + 0x268, name, 40); //read 20 bytes off the process's name and compare
+        KernelRead(proc + off_p_comm, name, 40); //read 20 bytes off the process's name and compare
         if (strstr(name, nm)) return proc;
         proc = KernelRead_64bits(proc);
     }
@@ -288,7 +288,7 @@ unsigned int pid_of_procName(char *nm) {
     uint64_t proc = KernelRead_64bits(Find_allproc());
     char name[40] = {0};
     while (proc) {
-        KernelRead(proc + 0x268, name, 40);
+        KernelRead(proc + off_p_comm, name, 40);
         if (strstr(name, nm)) return KernelRead_32bits(proc + off_p_pid);
         proc = KernelRead_64bits(proc);
     }
@@ -311,7 +311,7 @@ uint64_t taskStruct_of_procName(char *nm) {
     char name[40] = {0};
     while (task_kaddr) {
         uint64_t proc = KernelRead_64bits(task_kaddr + _koffset(KSTRUCT_OFFSET_TASK_BSD_INFO));
-        KernelRead(proc + 0x268, name, 40);
+        KernelRead(proc + off_p_comm, name, 40);
         if (strstr(name, nm)) return task_kaddr;
         task_kaddr = KernelRead_64bits(task_kaddr + _koffset(KSTRUCT_OFFSET_TASK_PREV));
     }

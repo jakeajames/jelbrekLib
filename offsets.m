@@ -8,6 +8,7 @@
 #import <sys/utsname.h>
 
 #import "offsets.h"
+#import "offsetof.h"
 
 #define SYSTEM_VERSION_EQUAL_TO(v)                  ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedSame)
 #define SYSTEM_VERSION_GREATER_THAN(v)              ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedDescending)
@@ -103,9 +104,30 @@ int _koffset(enum _kstruct_offset offset) {
   return _offsets[offset];
 }
 
-
 void _offsets_init() {
-  if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"11.3")) {
+    if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"12.0")) {
+        printf("[i] offsets selected for iOS 12.0 or above\n");
+        _offsets = _kstruct_offsets_11_3;
+        
+        // other struct offsets
+        off_p_pid = 0x60;
+        off_task = 0x10;
+        off_p_uid = 0x28;
+        off_p_gid = 0x2c;
+        off_p_ruid = 0x30;
+        off_p_rgid = 0x34;
+        off_p_ucred = 0xf8;
+        off_p_csflags = 0x290;
+        off_p_comm = 0x250;
+        off_p_textvp = 0x230;
+        off_p_textoff = 0x238;
+        off_p_cputype = 0x2a8;
+        off_p_cpu_subtype = 0x2ac; // ??
+        
+        off_csb_platform_binary = 0xa8;
+        off_csb_platform_path = 0xac;
+    }
+    else if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"11.3")) {
     printf("[i] offsets selected for iOS 11.3 or above\n");
     _offsets = _kstruct_offsets_11_3;
   } else if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"11.0")) {

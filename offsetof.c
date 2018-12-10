@@ -6,17 +6,21 @@ unsigned off_p_ruid = 0x38;              // proc_t::p_uid
 unsigned off_p_rgid = 0x3c;              // proc_t::p_uid
 unsigned off_p_ucred = 0x100;            // proc_t::p_ucred
 unsigned off_p_csflags = 0x2a8;          // proc_t::p_csflags
-unsigned off_itk_self = 0xD8;            // task_t::itk_self (convert_task_to_port)
-unsigned off_itk_sself = 0xE8;           // task_t::itk_sself (task_get_special_port)
-unsigned off_itk_bootstrap = 0x2b8;      // task_t::itk_bootstrap (task_get_special_port)
-unsigned off_itk_space = 0x308;          // task_t::itk_space
-unsigned off_ip_mscount = 0x9C;          // ipc_port_t::ip_mscount (ipc_port_make_send)
-unsigned off_ip_srights = 0xA0;          // ipc_port_t::ip_srights (ipc_port_make_send)
-unsigned off_ip_kobject = 0x68;          // ipc_port_t::ip_kobject
+unsigned off_p_comm = 0x268;             // proc_t::p_comm
 unsigned off_p_textvp = 0x248;           // proc_t::p_textvp
 unsigned off_p_textoff = 0x250;          // proc_t::p_textoff
 unsigned off_p_cputype = 0x2c0;          // proc_t::p_cputype
 unsigned off_p_cpu_subtype = 0x2c4;      // proc_t::p_cpu_subtype
+
+unsigned off_itk_self = 0xD8;            // task_t::itk_self (convert_task_to_port)
+unsigned off_itk_sself = 0xE8;           // task_t::itk_sself (task_get_special_port)
+unsigned off_itk_bootstrap = 0x2b8;      // task_t::itk_bootstrap (task_get_special_port)
+unsigned off_itk_space = 0x308;          // task_t::itk_space
+
+unsigned off_ip_mscount = 0x9C;          // ipc_port_t::ip_mscount (ipc_port_make_send)
+unsigned off_ip_srights = 0xA0;          // ipc_port_t::ip_srights (ipc_port_make_send)
+unsigned off_ip_kobject = 0x68;          // ipc_port_t::ip_kobject
+
 unsigned off_special = 2 * sizeof(long); // host::special
 unsigned off_ipc_space_is_table = 0x20;  // ipc_space::is_table?..
 

@@ -7,6 +7,8 @@ extern unsigned off_p_ruid;
 extern unsigned off_p_rgid;
 extern unsigned off_p_ucred;
 extern unsigned off_p_csflags;
+extern unsigned off_p_comm;
+
 extern unsigned off_itk_self;
 extern unsigned off_itk_sself;
 extern unsigned off_itk_bootstrap;
