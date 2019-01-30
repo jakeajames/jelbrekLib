@@ -230,7 +230,7 @@ int trustbin(const char *path) {
     printf("[*] trust_chain at 0x%llx\n", trust_chain);
     
     struct trust_chain fake_chain;
-    fake_chain.next = KernelRead_64bits(KernelRead_64bits(trust_chain));
+    fake_chain.next = KernelRead_64bits(trust_chain);
     *(uint64_t *)&fake_chain.uuid[0] = 0xabadbabeabadbabe;
     *(uint64_t *)&fake_chain.uuid[8] = 0xabadbabeabadbabe;
     
@@ -259,7 +259,7 @@ int trustbin(const char *path) {
     KernelWrite(kernel_trust, &fake_chain, sizeof(fake_chain));
     KernelWrite(kernel_trust + sizeof(fake_chain), allhash, cnt * sizeof(hash_t));
     
-    KernelWrite_64bits(KernelRead_64bits(trust_chain), kernel_trust);
+    KernelWrite_64bits(trust_chain, kernel_trust);
     
     free(allhash);
     
@@ -708,49 +708,20 @@ int remountRootFS() {
         // this is so we can use do_rename to work with the snapshot corresponding to that device
         // remember? we can't pass / to it as it's a snapshot by itself
         
-        //if (mountDevAtPathAsRW("/dev/disk0s1s1", "/var/rootfsmnt")) {
-            //printf("[-] Error mounting root at %s\n", "/var/rootfsmnt");
-        //}
-        
-        mountDevAtPathAsRW("/dev/disk0s1s1", "/var/rootfsmnt");
-        undoCredDonation(getpid(), creds);
-        
-        creds = borrowCredsFromDonor(getpid(), "/sbin/fsck_apfs", NULL, NULL, NULL, NULL, NULL, NULL, NULL);
-        
-        uint64_t rootfs_vnode = getVnodeAtPath("/var/rootfsmnt");
-        
-        printf("\n[*] vnode of /: 0x%llx\n", rootfs_vnode);
-        uint64_t v_mount = KernelRead_64bits(rootfs_vnode + off_v_mount);
-        uint32_t v_flag = KernelRead_32bits(v_mount + off_mnt_flag);
-        printf("[*] Removing RDONLY, NOSUID and ROOTFS flags\n");
-        printf("[*] Flags before 0x%x\n", v_flag);
-        v_flag &= ~MNT_NOSUID;
-        v_flag &= ~MNT_RDONLY;
-        v_flag &= ~MNT_ROOTFS;
-        
-        printf("[*] Flags now 0x%x\n", v_flag);
-        KernelWrite_32bits(v_mount + off_mnt_flag, v_flag);
-        
-        if (0) {
+        if (mountDevAtPathAsRW("/dev/disk0s1s1", "/var/rootfsmnt")) {
+            printf("[-] Error mounting root at %s\n", "/var/rootfsmnt");
         }
         else {
             printf("[*] Disabling the APFS snapshot mitigations\n");
             char *snap = find_system_snapshot();
             // rename the snapshot to "orig-fs" so the system can't find it and resets back to /dev/disk0s1s1 on next boot
-             if (snap && !do_rename("/var/rootfsmnt", snap, "orig-fs")) {
+            if (snap && !do_rename("/var/rootfsmnt", snap, "orig-fs")) {
                 // clean up
                 rv = 0;
                 unmount("/var/rootfsmnt", 0);
                 rmdir("/var/rootfsmnt");
             }
         }
-        
-        v_flag |= MNT_NOSUID;
-        v_flag |= MNT_RDONLY;
-        v_flag |= MNT_ROOTFS;
-        
-        v_mount = KernelRead_64bits(rootfs_vnode + off_v_mount);
-        KernelWrite_32bits(v_mount + off_mnt_flag, v_flag);
         
         printf("[*] Restoring our credentials\n");
         undoCredDonation(getpid(), creds);
