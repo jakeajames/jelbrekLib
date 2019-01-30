@@ -24,7 +24,7 @@ int init_jelbrek(mach_port_t tfpzero) {
         KernelBase = FindKernelBase();
         if (!KernelBase) {
             printf("[-] failed to find kernel base\n");
-            return 2; //theoretically this can never happen but meh
+            return 2;
         }
         KASLR_Slide = (uint32_t)(KernelBase - 0xFFFFFFF007004000); // slid kernel base - kernel base = kaslr slide
         
@@ -34,6 +34,8 @@ int init_jelbrek(mach_port_t tfpzero) {
             return 3;
         }
         printf("[+] Initialized patchfinder\n");
+        
+        uint64_t sb = unsandbox(getpid());
         
         NSFileManager *fileManager = [NSFileManager defaultManager];
         NSError *error;
@@ -47,7 +49,7 @@ int init_jelbrek(mach_port_t tfpzero) {
         [formatter setDateFormat:@"dd.MM.YY:HH.mm.ss"];
         
         NSString *docs = [[[fileManager URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] lastObject] path];
-        mkdir(strdup([docs UTF8String]), 0777);
+        mkdir((char *)[docs UTF8String], 0777);
         newPath = [docs stringByAppendingPathComponent:[NSString stringWithFormat:@"%@_kernelcache", [formatter stringFromDate:[NSDate date]]]];
         
         printf("[*] copying to %s\n", [newPath UTF8String]);
@@ -59,13 +61,16 @@ int init_jelbrek(mach_port_t tfpzero) {
             return 4;
         }
         
+        sandbox(getpid(), sb);
+        
         // init
-        if (initWithKernelCache(strdup([newPath UTF8String]))) {
+        if (initWithKernelCache((char *)[newPath UTF8String])) {
             printf("[-] Error initializing KernelSymbolFinder\n");
             return 4;
         }
+            
         printf("[+] Initialized KernelSymbolFinder\n");
-        unlink(strdup([newPath UTF8String]));
+        unlink((char *)[newPath UTF8String]);
         
         init_Kernel_Execute(); //kernel execution
         
@@ -77,7 +82,7 @@ void term_jelbrek() {
     printf("[*] Cleaning up...\n");
     TermPatchfinder(); // free memory used by patchfinder
     term_Kernel_Execute(); // free stuff used by kexecute
-    unlink(strcat(strdup([newPath UTF8String]), ".dec"));
+    unlink((char *)[[newPath stringByAppendingString:@".dec"] UTF8String]);
 }
 
 // Adds macho binaries on the AMFI trustcache
@@ -164,6 +169,7 @@ int trustbin(const char *path) {
                 
                 [paths addObject:@(fpath)];
                 printf("[*] Will trust %s\n", fpath);
+                free(fpath);
             }
         }
         if ([paths count] == 0) {
@@ -224,7 +230,7 @@ int trustbin(const char *path) {
     printf("[*] trust_chain at 0x%llx\n", trust_chain);
     
     struct trust_chain fake_chain;
-    fake_chain.next = KernelRead_64bits(trust_chain);
+    fake_chain.next = KernelRead_64bits(KernelRead_64bits(trust_chain));
     *(uint64_t *)&fake_chain.uuid[0] = 0xabadbabeabadbabe;
     *(uint64_t *)&fake_chain.uuid[8] = 0xabadbabeabadbabe;
     
@@ -252,7 +258,8 @@ int trustbin(const char *path) {
     
     KernelWrite(kernel_trust, &fake_chain, sizeof(fake_chain));
     KernelWrite(kernel_trust + sizeof(fake_chain), allhash, cnt * sizeof(hash_t));
-    KernelWrite_64bits(trust_chain, kernel_trust);
+    
+    KernelWrite_64bits(KernelRead_64bits(trust_chain), kernel_trust);
     
     free(allhash);
     
@@ -641,6 +648,8 @@ BOOL remount1126() {
     
     char *nmz = strdup("/dev/disk0s1s1");
     int rv = mount("apfs", "/", MNT_UPDATE, (void *)&nmz);
+    free(nmz);
+    
     printf("[*] Remounting /, return value = %d\n", rv);
     
     v_mount = KernelRead_64bits(rootfs_vnode + off_v_mount);
@@ -699,20 +708,50 @@ int remountRootFS() {
         // this is so we can use do_rename to work with the snapshot corresponding to that device
         // remember? we can't pass / to it as it's a snapshot by itself
         
-        if (mountDevAtPathAsRW("/dev/disk0s1s1", "/var/rootfsmnt")) {
-            printf("[-] Error mounting root at %s\n", "/var/rootfsmnt");
+        //if (mountDevAtPathAsRW("/dev/disk0s1s1", "/var/rootfsmnt")) {
+            //printf("[-] Error mounting root at %s\n", "/var/rootfsmnt");
+        //}
+        
+        mountDevAtPathAsRW("/dev/disk0s1s1", "/var/rootfsmnt");
+        undoCredDonation(getpid(), creds);
+        
+        creds = borrowCredsFromDonor(getpid(), "/sbin/fsck_apfs", NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+        
+        uint64_t rootfs_vnode = getVnodeAtPath("/var/rootfsmnt");
+        
+        printf("\n[*] vnode of /: 0x%llx\n", rootfs_vnode);
+        uint64_t v_mount = KernelRead_64bits(rootfs_vnode + off_v_mount);
+        uint32_t v_flag = KernelRead_32bits(v_mount + off_mnt_flag);
+        printf("[*] Removing RDONLY, NOSUID and ROOTFS flags\n");
+        printf("[*] Flags before 0x%x\n", v_flag);
+        v_flag &= ~MNT_NOSUID;
+        v_flag &= ~MNT_RDONLY;
+        v_flag &= ~MNT_ROOTFS;
+        
+        printf("[*] Flags now 0x%x\n", v_flag);
+        KernelWrite_32bits(v_mount + off_mnt_flag, v_flag);
+        
+        if (0) {
         }
         else {
             printf("[*] Disabling the APFS snapshot mitigations\n");
             char *snap = find_system_snapshot();
             // rename the snapshot to "orig-fs" so the system can't find it and resets back to /dev/disk0s1s1 on next boot
-            if (snap && !do_rename("/var/rootfsmnt", snap, "orig-fs")) {
+             if (snap && !do_rename("/var/rootfsmnt", snap, "orig-fs")) {
                 // clean up
                 rv = 0;
                 unmount("/var/rootfsmnt", 0);
                 rmdir("/var/rootfsmnt");
             }
         }
+        
+        v_flag |= MNT_NOSUID;
+        v_flag |= MNT_RDONLY;
+        v_flag |= MNT_ROOTFS;
+        
+        v_mount = KernelRead_64bits(rootfs_vnode + off_v_mount);
+        KernelWrite_32bits(v_mount + off_mnt_flag, v_flag);
+        
         printf("[*] Restoring our credentials\n");
         undoCredDonation(getpid(), creds);
         vnode_put(devVnode);

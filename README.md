@@ -2,7 +2,7 @@
 Give me tfp0, I give you jelbrek
 
 Library with commonly used patches in open-source jailbreaks. Call this a (light?) QiLin open-source alternative.
-h
+
 # Compiling:
 
     ./make.sh
@@ -15,8 +15,11 @@ h
 
 # Issues
 
-- Not everything tested, but stuff should work
-- AMFID patch won't resist after app enters background. Fix would be using a daemon (like amfidebilitate; well one is coming soon, open-source ;D) or injecting a dylib
+- AMFID patch won't resist after app enters background. Fix would be using a daemon (like amfidebilitate) or injecting a dylib (iOS 11)
+- trustbin() is broken on iOS 12 (will panic immediately after). Probably because of a bad patchfinder. (I get a valid pointer but if I do rk64(ptr) I get 0xXXXXXXXXfeedfacf)
+- rootFS remount is also broken on iOS 12. There is hardening on snapshot_rename() which *can* and *has* been (privately) bypassed, but it for sure isn't as bad as last year with iOS 11.3.1, where they made **major** changes. The only thing we need is figuring out how they check if the snapshot is the rootfs and not something in /var for example where snapshot_rename works fine.
+- patchAMFID() also broken. Not much point fixing this until we figure out CoreTrust. But, inject_dylib() probably works, if you wanna try with a binary signed with a legitimate certificate. Note: on A12 you need to take a completely different approach, bazad has proposed an amfid-patch-less-amfid-bypass in here https://github.com/bazad/blanket/tree/master/amfidupe, which will probably work but don't take my word for it.
+- kexecute() is also probably broken on A12. Use bazad's PAC bypass which offers the same thing.
 
 # Credits
 
