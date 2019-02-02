@@ -863,10 +863,6 @@ addr_t Find_vnode_lookup() {
     return Follow_call64(Kernel, call) + KernDumpBase;
 }
 
-
-//reversed from Electra
-//originally made by ninjaprawn
-
 addr_t Find_trustcache(void) {
     addr_t call, func;
     addr_t ref = Find_strref("%s: only allowed process can check the trust cache", 1, 1);
@@ -906,7 +902,22 @@ addr_t Find_trustcache(void) {
     if (!call) {
         return 0;
     }
-    return Calc64(Kernel, call, call + 24, 21) + KernDumpBase;
+    uint64_t val = Calc64(Kernel, call, call + 24, 21);
+    if (!val) {
+        // iOS 12
+        ref = Find_strref("\"loadable trust cache buffer too small (%ld) for entries claimed (%d)\"", 1, 0);
+        if (!ref) {
+            return 0;
+        }
+        ref -= KernDumpBase;
+        
+        val = Calc64(Kernel, ref-12*4, ref-12*4+12, 8);
+        if (!val) {
+            return 0;
+        }
+        return val + KernDumpBase;
+    }
+    return val + KernDumpBase;
 }
 
 // people that worked in unc0ver. sparkey maybe?
