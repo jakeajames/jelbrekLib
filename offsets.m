@@ -136,11 +136,11 @@ int _kstruct_offsets_12_0[] = {
 };
 
 int _koffset(enum _kstruct_offset offset) {
-  if (_offsets == NULL) {
-    printf("need to call offsets_init() prior to querying offsets\n");
-    return 0;
-  }
-  return _offsets[offset];
+    if (_offsets == NULL) {
+        printf("need to call offsets_init() prior to querying offsets\n");
+        return 0;
+    }
+    return _offsets[offset];
 }
 
 void _offsets_init() {
@@ -162,7 +162,7 @@ void _offsets_init() {
         off_p_textoff = 0x238;
         off_p_cputype = 0x2a8;
         off_p_cpu_subtype = 0x2ac; // ??
-        off_itk_space = 0x300; 
+        off_itk_space = 0x300;
         off_csb_platform_binary = 0xa8;
         off_csb_platform_path = 0xac;
         off_t_flags = 0x390;
@@ -175,13 +175,13 @@ void _offsets_init() {
         }
     }
     else if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"11.3")) {
-    printf("[i] offsets selected for iOS 11.3 or above\n");
-    _offsets = _kstruct_offsets_11_3;
-  } else if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"11.0")) {
-    printf("[i] offsets selected for iOS 11.0 to 11.2.6\n");
-    _offsets = _kstruct_offsets_11_0;
-  } else {
-    printf("[-] iOS version too low, 11.0 required\n");
-    exit(EXIT_FAILURE);
-  }
+        printf("[i] offsets selected for iOS 11.3 or above\n");
+        _offsets = _kstruct_offsets_11_3;
+    } else if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"11.0")) {
+        printf("[i] offsets selected for iOS 11.0 to 11.2.6\n");
+        _offsets = _kstruct_offsets_11_0;
+    } else {
+        printf("[-] iOS version too low, 11.0 required\n");
+        exit(EXIT_FAILURE);
+    }
 }

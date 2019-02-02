@@ -68,7 +68,7 @@ int init_jelbrek(mach_port_t tfpzero) {
             printf("[-] Error initializing KernelSymbolFinder\n");
             return 4;
         }
-            
+        
         printf("[+] Initialized KernelSymbolFinder\n");
         unlink((char *)[newPath UTF8String]);
         
@@ -437,36 +437,36 @@ BOOL patchEntitlements(pid_t pid, const char *entitlementString) {
         // this seems to work now
         // but panic after some time after process quits
         
-/*      printf("[entitlePid][*] Blob is bigger than what we have, getting more room\n");
-        
-        // calculate new length
-        uint32_t newLength = (uint32_t)(4 + 4 + strlen(entitlementString) +
-        strlen("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
-               "<plist version=\"1.0\">\n"
-               "<dict>\n\n</dict>\n"
-               "</plist>\n") + 1); // magic + length + data + null terminator
-        
-        // update length; BIG ENDIAN
-        blob->length = SWAP32(newLength);
-        
-        // add more space on kernel
-        entBlobAddr = Kernel_alloc(newLength);
-        Kernel_Execute(Find_bzero(), entBlobAddr, newLength, 0, 0, 0, 0, 0);
-        
-        // add old blob
-        KernelWrite(entBlobAddr, blob, length);
-        
-        // update address
-        csblob->csb_entitlements_blob = (const CS_GenericBlob *)entBlobAddr;
-        KernelWrite(cs_blobs, csblob, sizeof(struct cs_blob));
-        
-        // update hash
-        uint8_t newHash[CC_SHA256_DIGEST_LENGTH];
-        CC_SHA256(blob, newLength, (unsigned char *)newHash);
-        KernelWrite(codeDirAddr + SWAP32(code_dir->hashOffset) - CSSLOT_ENTITLEMENTS * code_dir->hashSize, newHash, sizeof(newHash));
-        
-        length = newLength;
-*/
+        /*      printf("[entitlePid][*] Blob is bigger than what we have, getting more room\n");
+         
+         // calculate new length
+         uint32_t newLength = (uint32_t)(4 + 4 + strlen(entitlementString) +
+         strlen("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+         "<plist version=\"1.0\">\n"
+         "<dict>\n\n</dict>\n"
+         "</plist>\n") + 1); // magic + length + data + null terminator
+         
+         // update length; BIG ENDIAN
+         blob->length = SWAP32(newLength);
+         
+         // add more space on kernel
+         entBlobAddr = Kernel_alloc(newLength);
+         Kernel_Execute(Find_bzero(), entBlobAddr, newLength, 0, 0, 0, 0, 0);
+         
+         // add old blob
+         KernelWrite(entBlobAddr, blob, length);
+         
+         // update address
+         csblob->csb_entitlements_blob = (const CS_GenericBlob *)entBlobAddr;
+         KernelWrite(cs_blobs, csblob, sizeof(struct cs_blob));
+         
+         // update hash
+         uint8_t newHash[CC_SHA256_DIGEST_LENGTH];
+         CC_SHA256(blob, newLength, (unsigned char *)newHash);
+         KernelWrite(codeDirAddr + SWAP32(code_dir->hashOffset) - CSSLOT_ENTITLEMENTS * code_dir->hashSize, newHash, sizeof(newHash));
+         
+         length = newLength;
+         */
     }
     
     uint8_t entHash[CC_SHA256_DIGEST_LENGTH];
@@ -501,7 +501,7 @@ BOOL patchEntitlements(pid_t pid, const char *entitlementString) {
     
     // write our new blob
     KernelWrite(entBlobAddr, blob, length);
-  
+    
     //KernelWrite_64bits((uint64_t) csblob->csb_entitlements, OSUnserializeXML(blob->data));
     
     bzero(blob, sizeof(CS_GenericBlob));
@@ -795,7 +795,7 @@ void HexDump(uint64_t addr, size_t size) {
 }
 
 BOOL PatchHostPriv(mach_port_t host) {
-
+    
 #define IO_ACTIVE 0x80000000
 #define IKOT_HOST_PRIV 4
     
@@ -854,4 +854,4 @@ BOOL fixMmap(char *path) {
 
 /*int addSandboxExtension() {
  
-}*/
+ }*/
