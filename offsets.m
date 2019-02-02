@@ -162,11 +162,10 @@ void _offsets_init() {
         off_p_textoff = 0x238;
         off_p_cputype = 0x2a8;
         off_p_cpu_subtype = 0x2ac; // ??
-        
-        off_itk_space = 0x300;
-        
+        off_itk_space = 0x300; 
         off_csb_platform_binary = 0xa8;
         off_csb_platform_path = 0xac;
+        off_t_flags = 0x390;
         
         struct utsname u = { 0 };
         uname(&u);
