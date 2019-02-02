@@ -78,6 +78,80 @@ int init_jelbrek(mach_port_t tfpzero) {
     }
 }
 
+int init_with_kbase(mach_port_t tfpzero, uint64_t kernelBase) {
+    @autoreleasepool {
+        printf("[*] Initializing jelbrekLib\n");
+        
+        if (!MACH_PORT_VALID(tfpzero)) {
+            printf("[-] tfp0 port not valid\n");
+            return 1;
+        }
+        _offsets_init(); // Ian Beer's offset struct
+        
+        //------- init the required variables -------//
+        TFP0 = tfpzero;
+        
+        //---- init utilities ----//
+        init_kernel_utils(TFP0); // memory stuff
+        
+        KernelBase = kernelBase;
+        if (!KernelBase) {
+            printf("[-] failed to find kernel base\n");
+            return 2;
+        }
+        KASLR_Slide = (uint32_t)(KernelBase - 0xFFFFFFF007004000); // slid kernel base - kernel base = kaslr slide
+        
+        int ret = InitPatchfinder(KernelBase, NULL); // patchfinder
+        if (ret) {
+            printf("[-] Failed to initialize patchfinder\n");
+            return 3;
+        }
+        printf("[+] Initialized patchfinder\n");
+        
+        uint64_t sb = unsandbox(getpid());
+        
+        NSFileManager *fileManager = [NSFileManager defaultManager];
+        NSError *error;
+        
+        // random enough
+        // let's say this is ran from an unsandboxed process
+        // home dir is /var/mobile/Documents
+        // there's a chance a file named kernelcache is there
+        // who knows what people do XD, at least I have done it
+        NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+        [formatter setDateFormat:@"dd.MM.YY:HH.mm.ss"];
+        
+        NSString *docs = [[[fileManager URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] lastObject] path];
+        mkdir((char *)[docs UTF8String], 0777);
+        newPath = [docs stringByAppendingPathComponent:[NSString stringWithFormat:@"%@_kernelcache", [formatter stringFromDate:[NSDate date]]]];
+        
+        printf("[*] copying to %s\n", [newPath UTF8String]);
+        
+        // create a copy to be safe
+        [fileManager copyItemAtPath:@"/System/Library/Caches/com.apple.kernelcaches/kernelcache" toPath:newPath error:&error];
+        if (error) {
+            printf("[-] Failed to copy kernelcache with error: %s\n", [[error localizedDescription] UTF8String]);
+            return 4;
+        }
+        
+        sandbox(getpid(), sb);
+        
+        // init
+        if (initWithKernelCache((char *)[newPath UTF8String])) {
+            printf("[-] Error initializing KernelSymbolFinder\n");
+            return 4;
+        }
+        
+        printf("[+] Initialized KernelSymbolFinder\n");
+        unlink((char *)[newPath UTF8String]);
+        
+        init_Kernel_Execute(); //kernel execution
+        
+        return 0;
+    }
+}
+
+
 void term_jelbrek() {
     printf("[*] Cleaning up...\n");
     TermPatchfinder(); // free memory used by patchfinder
