@@ -817,6 +817,7 @@ addr_t Find_bcopy(void) {
 uint64_t Find_rootvnode(void) {
     // Find the first reference to the string
     addr_t ref = Find_strref("/var/run/.vfs_rsrc_streams_%p%x", 1, 0);
+    
     if (!ref) {
         return 0;
     }
@@ -837,7 +838,29 @@ uint64_t Find_rootvnode(void) {
         }
     }
     if (!weird_instruction) {
-        return 0;
+        ref = Find_strref("/var/run/.vfs_rsrc_streams_%p%x", 2, 0);
+        
+        if (!ref) {
+            return 0;
+        }
+        
+        ref -= KernDumpBase;
+        
+        start = BOF64(Kernel, XNUCore_Base, ref);
+        if (!start) {
+            return 0;
+        }
+
+        for (int i = 4; i < 4*0x100; i+=4) {
+            uint32_t op = *(uint32_t *)(Kernel + ref - i);
+            if (op == 0xB25B03E9) {
+                weird_instruction = ref-i;
+                break;
+            }
+        }
+        if (!weird_instruction) {
+            return 0;
+        }
     }
     
     uint64_t val = Calc64(Kernel, start, weird_instruction, 8);
