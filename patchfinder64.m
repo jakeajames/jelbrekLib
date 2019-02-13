@@ -894,48 +894,65 @@ addr_t Find_vnode_lookup() {
     }
   
     func = Follow_call64(Kernel, call);
+    if (!func) {
+        return 0;
+    }
+  
     return func + KernDumpBase;
 }
 
 addr_t Find_trustcache(void) {
-    addr_t call, func;
-    addr_t ref = Find_strref("%s: only allowed process can check the trust cache", 1, 1);
+    addr_t call, func, ref;
+  
+    ref = Find_strref("%s: only allowed process can check the trust cache", 1, 1);
     if (!ref) {
-        return 0;
+        ref = Find_strref("%s: only allowed process can check the trust cache", 1, 0);
+        if (!ref) {
+            return 0;
+        }
     }
     ref -= KernDumpBase;
+  
     call = Step64_back(Kernel, ref, 44, INSN_CALL);
     if (!call) {
         return 0;
     }
+  
     func = Follow_call64(Kernel, call);
     if (!func) {
         return 0;
     }
+  
     call = Step64(Kernel, func, 32, INSN_CALL);
     if (!call) {
         return 0;
     }
+  
     func = Follow_call64(Kernel, call);
     if (!func) {
         return 0;
     }
+  
     call = Step64(Kernel, func, 32, INSN_CALL);
     if (!call) {
         return 0;
     }
+  
     call = Step64(Kernel, call + 4, 32, INSN_CALL);
     if (!call) {
         return 0;
     }
+  
     func = Follow_call64(Kernel, call);
     if (!func) {
         return 0;
     }
+  
     call = Step64(Kernel, func, 48, INSN_CALL);
     if (!call) {
         return 0;
     }
+  
     uint64_t val = Calc64(Kernel, call, call + 24, 21);
     if (!val) {
         // iOS 12
@@ -954,7 +971,6 @@ addr_t Find_trustcache(void) {
     return val + KernDumpBase;
 }
 
-// people that worked in unc0ver. sparkey maybe?
 addr_t Find_amficache() {
     uint64_t cbz, call, func, val;
     uint64_t ref = Find_strref("amfi_prevent_old_entitled_platform_binaries", 1, 1);
