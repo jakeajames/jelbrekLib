@@ -454,6 +454,12 @@ static addr_t CString_base = 0;
 static addr_t CString_size = 0;
 static addr_t PString_base = 0;
 static addr_t PString_size = 0;
+static addr_t OSLog_base = 0;
+static addr_t OSLog_size = 0;
+static addr_t data_base = 0;
+static addr_t data_size = 0;
+static addr_t data_const_base = 0;
+static addr_t data_const_size = 0;
 static addr_t KernDumpBase = -1;
 static addr_t Kernel_entry = 0;
 static void *Kernel_mh = 0;
@@ -525,6 +531,10 @@ InitPatchfinder(addr_t base, const char *filename)
                         CString_base = sec[j].addr;
                         CString_size = sec[j].size;
                     }
+                    if (!strcmp(sec[j].sectname, "__os_log")) {
+                        OSLog_base = sec[j].addr;
+                        OSLog_size = sec[j].size;
+                    }
                 }
             }
             if (!strcmp(seg->segname, "__PRELINK_TEXT")) {
@@ -563,6 +573,7 @@ InitPatchfinder(addr_t base, const char *filename)
     Prelink_Base -= KernDumpBase;
     CString_base -= KernDumpBase;
     PString_base -= KernDumpBase;
+    OSLog_base -= KernDumpBase;
     Kernel_size = max - min;
     
 #ifdef __ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__
@@ -655,15 +666,20 @@ Find_register_value(addr_t where, int reg)
 }
 
 addr_t
-Find_reference(addr_t to, int n, int prelink)
+Find_reference(addr_t to, int n, int type)
 {
     addr_t ref, end;
-    addr_t base = XNUCore_Base;
-    addr_t size = XNUCore_Size;
-    if (prelink) {
+    addr_t base;
+    addr_t size;
+    
+    base = XNUCore_Base;
+    size = XNUCore_Size;
+    
+    if (type == 1) {
         base = Prelink_Base;
         size = Prelink_Size;
     }
+    
     if (n <= 0) {
         n = 1;
     }
@@ -679,21 +695,31 @@ Find_reference(addr_t to, int n, int prelink)
     return ref + KernDumpBase;
 }
 
+
 addr_t
-Find_strref(const char *string, int n, int prelink)
+Find_strref(const char *string, int n, int type)
 {
     uint8_t *str;
-    addr_t base = CString_base;
-    addr_t size = CString_size;
-    if (prelink) {
+    addr_t base, size;
+    
+    if (type == 0) {
+        base = CString_base;
+        size = CString_size;
+    }
+    if (type == 1) {
         base = PString_base;
         size = PString_size;
     }
+    else {
+        base = OSLog_base;
+        size = OSLog_size;
+    }
+    
     str = Boyermoore_horspool_memmem(Kernel + base, size, (uint8_t *)string, strlen(string));
     if (!str) {
         return 0;
     }
-    return Find_reference(str - Kernel + KernDumpBase, n, prelink);
+    return Find_reference(str - Kernel + KernDumpBase, n, type);
 }
 
 /****** fun *******/
@@ -1157,15 +1183,37 @@ addr_t Find_OSBoolean_False() {
 
 addr_t Find_osunserializexml() {
     addr_t ref = Find_strref("OSUnserializeXML: %s near line %d\n", 1, 0);
+    if (!ref) {
+        return 0;
+    }
     ref -= KernDumpBase;
+    
     uint64_t start = BOF64(Kernel, XNUCore_Base, ref);
+    if (!start) {
+        return 0;
+    }
+    
     return start + KernDumpBase;
 }
 
 addr_t Find_smalloc() {
     addr_t ref = Find_strref("sandbox memory allocation failure", 1, 1);
+    if (!ref) {
+        ref = Find_strref("sandbox memory allocation failure", 1, 2);
+        if (!ref) {
+            return 0;
+        }
+    }
     ref -= KernDumpBase;
+    
     uint64_t start = BOF64(Kernel, Prelink_Base, ref);
+    if (!start) {
+        start = BOF64(Kernel, XNUCore_Base, ref);
+        if (!start) {
+            return 0;
+        }
+    }
+    
     return start + KernDumpBase;
 }
 
