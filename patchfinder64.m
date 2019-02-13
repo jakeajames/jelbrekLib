@@ -10,7 +10,7 @@
 #import <assert.h>
 #import <stdint.h>
 #import <string.h>
-#import "kernel_utils.h"
+#import <stdbool.h>
 
 typedef unsigned long long addr_t;
 
@@ -697,7 +697,7 @@ Find_reference(addr_t to, int n, int type)
 
 
 addr_t
-Find_strref(const char *string, int n, int type)
+Find_strref(const char *string, int n, int type, bool exactMatch)
 {
     uint8_t *str;
     addr_t base, size;
@@ -716,6 +716,15 @@ Find_strref(const char *string, int n, int type)
     }
     
     str = Boyermoore_horspool_memmem(Kernel + base, size, (uint8_t *)string, strlen(string));
+    
+    if (exactMatch) {
+        while (strcmp((char *)str, string)) {
+            base += ((uint64_t)str - (uint64_t)Kernel - (uint64_t)base) + 1;
+            size -= strlen((char *)str) + 1;
+            str = Boyermoore_horspool_memmem(Kernel + base, size, (uint8_t *)string, strlen(string));
+        }
+    }
+    
     if (!str) {
         return 0;
     }
@@ -744,7 +753,7 @@ addr_t Find_add_x0_x0_0x40_ret(void) {
 
 uint64_t Find_allproc(void) {
     // Find the first reference to the string
-    addr_t ref = Find_strref("\"pgrp_add : pgrp is dead adding process\"", 1, 0);
+    addr_t ref = Find_strref("\"pgrp_add : pgrp is dead adding process\"", 1, 0, false);
     if (!ref) {
         return 0;
     }
@@ -779,7 +788,7 @@ uint64_t Find_allproc(void) {
 
 uint64_t Find_copyout(void) {
     // Find the first reference to the string
-    addr_t ref = Find_strref("\"%s(%p, %p, %lu) - transfer too large\"", 2, 0);
+    addr_t ref = Find_strref("\"%s(%p, %p, %lu) - transfer too large\"", 2, 0, false);
     if (!ref) {
         return 0;
     }
@@ -842,7 +851,7 @@ addr_t Find_bcopy(void) {
 
 uint64_t Find_rootvnode(void) {
     // Find the first reference to the string
-    addr_t ref = Find_strref("/var/run/.vfs_rsrc_streams_%p%x", 1, 0);
+    addr_t ref = Find_strref("/var/run/.vfs_rsrc_streams_%p%x", 1, 0, false);
     
     if (!ref) {
         return 0;
@@ -864,7 +873,7 @@ uint64_t Find_rootvnode(void) {
         }
     }
     if (!weird_instruction) {
-        ref = Find_strref("/var/run/.vfs_rsrc_streams_%p%x", 2, 0);
+        ref = Find_strref("/var/run/.vfs_rsrc_streams_%p%x", 2, 0, false);
         
         if (!ref) {
             return 0;
@@ -876,7 +885,7 @@ uint64_t Find_rootvnode(void) {
         if (!start) {
             return 0;
         }
-
+        
         for (int i = 4; i < 4*0x100; i+=4) {
             uint32_t op = *(uint32_t *)(Kernel + ref - i);
             if (op == 0xB25B03E9) {
@@ -900,112 +909,112 @@ uint64_t Find_rootvnode(void) {
 
 addr_t Find_vnode_lookup() {
     addr_t ref, call, bof, func;
-    ref = Find_strref("/private/var/mobile", 0, 0);
+    ref = Find_strref("/private/var/mobile", 0, 0, false);
     if (!ref) {
         return 0;
     }
-  
+    
     ref -= KernDumpBase;
     bof = BOF64(Kernel, XNUCore_Base, ref);
     if (!bof) {
         return 0;
     }
-  
+    
     call = Step64(Kernel, ref, ref - bof, INSN_CALL);
     if (!call) {
-        ref = Find_strref("/private/var/mobile", 2, 0);
+        ref = Find_strref("/private/var/mobile", 2, 0, false);
         if (!ref) {
             return 0;
         }
         ref -= KernDumpBase;
-      
+        
         bof = BOF64(Kernel, XNUCore_Base, ref);
         if (!bof) {
             return 0;
         }
-      
+        
         call = Step64(Kernel, ref, ref - bof, INSN_CALL);
         if (!call) {
             return 0;
         }
     }
-  
+    
     call += 4;
     call = Step64(Kernel, call, call - bof, INSN_CALL);
     if (!call) {
         return 0;
     }
-  
+    
     call += 4;
     call = Step64(Kernel, call, call - bof, INSN_CALL);
     if (!call) {
         return 0;
     }
-  
+    
     func = Follow_call64(Kernel, call);
     if (!func) {
         return 0;
     }
-  
+    
     return func + KernDumpBase;
 }
 
 addr_t Find_trustcache(void) {
     addr_t call, func, ref;
-  
-    ref = Find_strref("%s: only allowed process can check the trust cache", 1, 1);
+    
+    ref = Find_strref("%s: only allowed process can check the trust cache", 1, 1, false);
     if (!ref) {
-        ref = Find_strref("%s: only allowed process can check the trust cache", 1, 0);
+        ref = Find_strref("%s: only allowed process can check the trust cache", 1, 0, false);
         if (!ref) {
             return 0;
         }
     }
     ref -= KernDumpBase;
-  
+    
     call = Step64_back(Kernel, ref, 44, INSN_CALL);
     if (!call) {
         return 0;
     }
-  
+    
     func = Follow_call64(Kernel, call);
     if (!func) {
         return 0;
     }
-  
+    
     call = Step64(Kernel, func, 32, INSN_CALL);
     if (!call) {
         return 0;
     }
-  
+    
     func = Follow_call64(Kernel, call);
     if (!func) {
         return 0;
     }
-  
+    
     call = Step64(Kernel, func, 32, INSN_CALL);
     if (!call) {
         return 0;
     }
-  
+    
     call = Step64(Kernel, call + 4, 32, INSN_CALL);
     if (!call) {
         return 0;
     }
-  
+    
     func = Follow_call64(Kernel, call);
     if (!func) {
         return 0;
     }
-  
+    
     call = Step64(Kernel, func, 48, INSN_CALL);
     if (!call) {
         return 0;
     }
-  
+    
     uint64_t val = Calc64(Kernel, call, call + 24, 21);
     if (!val) {
         // iOS 12
-        ref = Find_strref("\"loadable trust cache buffer too small (%ld) for entries claimed (%d)\"", 1, 0);
+        ref = Find_strref("\"loadable trust cache buffer too small (%ld) for entries claimed (%d)\"", 1, 0, false);
         if (!ref) {
             return 0;
         }
@@ -1022,10 +1031,10 @@ addr_t Find_trustcache(void) {
 
 addr_t Find_amficache() {
     uint64_t cbz, call, func, val;
-    uint64_t ref = Find_strref("amfi_prevent_old_entitled_platform_binaries", 1, 1);
+    uint64_t ref = Find_strref("amfi_prevent_old_entitled_platform_binaries", 1, 1, false);
     if (!ref) {
         // iOS 11
-        ref = Find_strref("com.apple.MobileFileIntegrity", 0, 1);
+        ref = Find_strref("com.apple.MobileFileIntegrity", 0, 1, false);
         if (!ref) {
             return 0;
         }
@@ -1053,7 +1062,7 @@ okay:
     }
     val = Calc64(Kernel, func, func + 16, 8);
     if (!val) {
-        ref = Find_strref("%s: only allowed process can check the trust cache", 1, 1); // Trying to find AppleMobileFileIntegrityUserClient::isCdhashInTrustCache
+        ref = Find_strref("%s: only allowed process can check the trust cache", 1, 1, false); // Trying to find AppleMobileFileIntegrityUserClient::isCdhashInTrustCache
         if (!ref) {
             return 0;
         }
@@ -1101,7 +1110,7 @@ addr_t Find_zone_map_ref(void) {
     // \"Nothing being freed to the zone_map. start = end = %p\\n\"
     uint64_t val = KernDumpBase;
     
-    addr_t ref = Find_strref("\"Nothing being freed to the zone_map. start = end = %p\\n\"", 1, 0);
+    addr_t ref = Find_strref("\"Nothing being freed to the zone_map. start = end = %p\\n\"", 1, 0, false);
     ref -= KernDumpBase;
     
     // skip add & adrp for panic str
@@ -1136,7 +1145,7 @@ addr_t Find_zone_map_ref(void) {
 
 addr_t Find_OSBoolean_True() {
     addr_t val;
-    addr_t ref = Find_strref("Delay Autounload", 0, 0);
+    addr_t ref = Find_strref("Delay Autounload", 0, 0, false);
     if (!ref) {
         return 0;
     }
@@ -1151,7 +1160,7 @@ addr_t Find_OSBoolean_True() {
         }
     }
     if (!weird_instruction) {
-        ref = Find_strref("Delay Autounload", 2, 0);
+        ref = Find_strref("Delay Autounload", 2, 0, false);
         if (!ref) {
             return 0;
         }
@@ -1182,7 +1191,7 @@ addr_t Find_OSBoolean_False() {
 }
 
 addr_t Find_osunserializexml() {
-    addr_t ref = Find_strref("OSUnserializeXML: %s near line %d\n", 1, 0);
+    addr_t ref = Find_strref("OSUnserializeXML: %s near line %d\n", 1, 0, false);
     if (!ref) {
         return 0;
     }
@@ -1197,9 +1206,9 @@ addr_t Find_osunserializexml() {
 }
 
 addr_t Find_smalloc() {
-    addr_t ref = Find_strref("sandbox memory allocation failure", 1, 1);
+    addr_t ref = Find_strref("sandbox memory allocation failure", 1, 1, false);
     if (!ref) {
-        ref = Find_strref("sandbox memory allocation failure", 1, 2);
+        ref = Find_strref("sandbox memory allocation failure", 1, 2, false);
         if (!ref) {
             return 0;
         }
@@ -1245,7 +1254,7 @@ uint64_t Find_bootargs(void) {
      BL              _panic
      */
     
-    addr_t ref = Find_strref("\"bsd_init: cannot find root vnode: %s\"", 1, 0);
+    addr_t ref = Find_strref("\"bsd_init: cannot find root vnode: %s\"", 1, 0, false);
     
     if (ref == 0) {
         return 0;
@@ -1301,4 +1310,3 @@ uint64_t Find_bootargs(void) {
     
     return val;
 }
-
