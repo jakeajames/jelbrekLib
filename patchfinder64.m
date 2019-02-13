@@ -731,7 +731,7 @@ uint64_t Find_allproc(void) {
     
     // Find AND W8, W8, #0xFFFFDFFF - it's a pretty distinct instruction
     addr_t weird_instruction = 0;
-    for (int i = 4; i < 4*0x100; i+=4) {
+    for (int i = 4; i < 5*0x100; i+=4) {
         uint32_t op = *(uint32_t *)(Kernel + ref + i);
         if (op == 0x12127908) {
             weird_instruction = ref+i;
