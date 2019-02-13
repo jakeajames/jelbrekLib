@@ -1125,7 +1125,22 @@ addr_t Find_OSBoolean_True() {
         }
     }
     if (!weird_instruction) {
-        return 0;
+        ref = Find_strref("Delay Autounload", 2, 0);
+        if (!ref) {
+            return 0;
+        }
+        ref -= KernDumpBase;
+        
+        for (int i = 4; i < 4*0x100; i+=4) {
+            uint32_t op = *(uint32_t *)(Kernel + ref + i);
+            if (op == 0x320003E0) {
+                weird_instruction = ref+i;
+                break;
+            }
+        }
+        if (!weird_instruction) {
+            return 0;
+        }
     }
     
     val = Calc64(Kernel, ref, weird_instruction, 8);
@@ -1139,6 +1154,7 @@ addr_t Find_OSBoolean_True() {
 addr_t Find_OSBoolean_False() {
     return Find_OSBoolean_True()+8;
 }
+
 addr_t Find_osunserializexml() {
     addr_t ref = Find_strref("OSUnserializeXML: %s near line %d\n", 1, 0);
     ref -= KernDumpBase;
