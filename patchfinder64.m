@@ -706,7 +706,7 @@ Find_strref(const char *string, int n, int type)
         base = CString_base;
         size = CString_size;
     }
-    if (type == 1) {
+    else if (type == 1) {
         base = PString_base;
         size = PString_size;
     }
