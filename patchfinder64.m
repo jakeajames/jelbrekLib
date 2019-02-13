@@ -243,6 +243,20 @@ BOF64(const uint8_t *buf, addr_t start, addr_t where)
                     //printf("%x: STP x, y, [SP,#-imm]!\n", prev);
                     return prev;
                 }
+                // try something else
+                while (where > start) {
+                    where -= 4;
+                    au = *(uint32_t *)(buf + where);
+                    // SUB SP, SP, #imm
+                    if ((au & 0xFFC003FF) == 0xD10003FF && ((au >> 10) & 0xFFF) == delta + 0x10) {
+                        return where;
+                    }
+                    // STP x, y, [SP,#imm]
+                    if ((au & 0xFFC003E0) != 0xA90003E0) {
+                        where += 4;
+                        break;
+                    }
+                }
             }
         }
     }
