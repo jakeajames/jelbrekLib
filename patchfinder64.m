@@ -12,6 +12,8 @@
 #import <string.h>
 #import <stdbool.h>
 
+#import "kernel_utils.h"
+
 typedef unsigned long long addr_t;
 
 #define IS64(image) (*(uint8_t *)(image) & 1)
