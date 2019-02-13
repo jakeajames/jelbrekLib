@@ -266,7 +266,7 @@ BOF64(const uint8_t *buf, addr_t start, addr_t where)
 }
 
 static addr_t
-xref64(const uint8_t *buf, addr_t start, addr_t end, addr_t what)
+XREF64(const uint8_t *buf, addr_t start, addr_t end, addr_t what)
 {
     addr_t i;
     uint64_t value[32];
@@ -688,7 +688,7 @@ Find_reference(addr_t to, int n, int type)
     end = base + size;
     to -= KernDumpBase;
     do {
-        ref = xref64(Kernel, base, end, to);
+        ref = XREF64(Kernel, base, end, to);
         if (!ref) {
             return 0;
         }
@@ -1311,4 +1311,32 @@ uint64_t Find_bootargs(void) {
     val += (*insn<<9 & 0x1ffffc000) | (*insn>>17 & 0x3000);
     
     return val;
+}
+
+addr_t Find_kernel_map() {
+    uint64_t ref = Find_strref("AMFI: Trying to load a trust cache while device is locked, only", 1, 1, false);
+    if (!ref) {
+        ref = Find_strref("AMFI: Trying to load a trust cache while device is locked, only", 1, 0, false);
+        if (!ref) {
+            return 0;
+        }
+    }
+    ref -= KernDumpBase;
+    
+    uint64_t func = BOF64(Kernel, (ref > XNUCore_Base) ? XNUCore_Base : Prelink_Base, ref);
+    if (!func) {
+        return 0;
+    }
+    
+    ref = Step64(Kernel, func, 60, INSN_ADRP);
+    if (!ref) {
+        return 0;
+    }
+    
+    uint64_t val = Calc64(Kernel, ref, ref + 8, 25);
+    if (!val) {
+        return 0;
+    }
+    
+    return (*(uint64_t *)(Kernel + val)) ? *(uint64_t *)(Kernel + val) : val + KernDumpBase;
 }
