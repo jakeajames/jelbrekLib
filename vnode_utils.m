@@ -15,6 +15,9 @@
 #import <stdlib.h>
 
 extern uint64_t KASLR_Slide;
+static uint64_t _vnode_lookup = 0;
+static uint64_t _vnode_put = 0;
+static uint64_t _vfs_context_current = 0;
 
 int vnode_lookup(const char *path, int flags, uint64_t *vnode, uint64_t vfs_context) {
     
@@ -23,7 +26,11 @@ int vnode_lookup(const char *path, int flags, uint64_t *vnode, uint64_t vfs_cont
     uint64_t ptr2 = Kernel_alloc(len);
     KernelWrite(ptr2, path, len);
     
-    if (Kernel_Execute(find_symbol("_vnode_lookup", false) + KASLR_Slide, ptr2, flags, ptr, vfs_context, 0, 0, 0)) {
+    _vnode_lookup = find_symbol("_vnode_lookup", false);
+    if (!_vnode_lookup) _vnode_lookup = Find_vnode_lookup();
+    else _vnode_lookup += KASLR_Slide;
+    
+    if (Kernel_Execute(_vnode_lookup, ptr2, flags, ptr, vfs_context, 0, 0, 0)) {
         return -1;
     }
     *vnode = KernelRead_64bits(ptr);
@@ -33,9 +40,19 @@ int vnode_lookup(const char *path, int flags, uint64_t *vnode, uint64_t vfs_cont
 }
 
 uint64_t get_vfs_context() {
-    return ZmFixAddr(Kernel_Execute(find_symbol("_vfs_context_current", false) + KASLR_Slide, 1, 0, 0, 0, 0, 0, 0));
+    
+    _vfs_context_current = find_symbol("_vfs_context_current", false);
+    if (!_vfs_context_current) _vfs_context_current = Find_vfs_context_current();
+    else _vfs_context_current += KASLR_Slide;
+    
+    return ZmFixAddr(Kernel_Execute(_vfs_context_current, 1, 0, 0, 0, 0, 0, 0));
 }
 
 int vnode_put(uint64_t vnode) {
-    return (int)Kernel_Execute(find_symbol("_vnode_put", false) + KASLR_Slide, vnode, 0, 0, 0, 0, 0, 0);
+    
+    _vnode_put = find_symbol("_vnode_put", false);
+    if (!_vnode_put) _vnode_put = Find_vnode_put();
+    else _vnode_put += KASLR_Slide;
+    
+    return (int)Kernel_Execute(_vfs_context_current, vnode, 0, 0, 0, 0, 0, 0);
 }

@@ -14,6 +14,8 @@
 
 #import "kernel_utils.h"
 
+extern uint32_t KASLR_Slide;
+
 typedef unsigned long long addr_t;
 
 #define IS64(image) (*(uint8_t *)(image) & 1)
@@ -438,13 +440,6 @@ Follow_cbz(const uint8_t *buf, addr_t cbz)
 #import <unistd.h>
 #import <mach-o/loader.h>
 
-//#define __ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__
-
-#ifdef __ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__
-#import <mach/mach.h>
-size_t KernelRead(uint64_t where, void *p, size_t size);
-#endif
-
 static uint8_t *Kernel = NULL;
 static size_t Kernel_size = 0;
 
@@ -479,13 +474,6 @@ InitPatchfinder(addr_t base, const char *filename)
     addr_t max = 0;
     int is64 = 0;
     
-#ifdef __ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__
-#define close(f)
-    rv = KernelRead(base, buf, sizeof(buf));
-    if (rv != sizeof(buf)) {
-        return -1;
-    }
-#else    /* __ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__ */
     int fd = open(filename, O_RDONLY);
     if (fd < 0) {
         return -1;
@@ -496,7 +484,6 @@ InitPatchfinder(addr_t base, const char *filename)
         close(fd);
         return -1;
     }
-#endif    /* __ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__ */
     
     if (!MACHO(buf)) {
         close(fd);
@@ -578,22 +565,6 @@ InitPatchfinder(addr_t base, const char *filename)
     OSLog_base -= KernDumpBase;
     Kernel_size = max - min;
     
-#ifdef __ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__
-    Kernel = malloc(Kernel_size);
-    if (!Kernel) {
-        return -1;
-    }
-    rv = KernelRead(KernDumpBase, Kernel, Kernel_size);
-    if (rv != Kernel_size) {
-        free(Kernel);
-        return -1;
-    }
-    
-    Kernel_mh = Kernel + base - min;
-    
-    (void)filename;
-#undef close
-#else    /* __ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__ */
     Kernel = calloc(1, Kernel_size);
     if (!Kernel) {
         close(fd);
@@ -614,7 +585,7 @@ InitPatchfinder(addr_t base, const char *filename)
             if (!Kernel_mh) {
                 Kernel_mh = Kernel + seg->vmaddr - min;
             }
-            printf("%s\n", seg->segname);
+            //printf("%s\n", seg->segname);
             if (!strcmp(seg->segname, "__LINKEDIT")) {
                 Kernel_delta = seg->vmaddr - min - seg->fileoff;
             }
@@ -625,7 +596,6 @@ InitPatchfinder(addr_t base, const char *filename)
     close(fd);
     
     (void)base;
-#endif    /* __ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__ */
     return 0;
 }
 
@@ -741,13 +711,13 @@ addr_t Find_add_x0_x0_0x40_ret(void) {
     k = (uint32_t *)(Kernel + XNUCore_Base);
     for (off = 0; off < XNUCore_Size - 4; off += 4, k++) {
         if (k[0] == 0x91010000 && k[1] == 0xD65F03C0) {
-            return off + XNUCore_Base + KernDumpBase;
+            return off + XNUCore_Base + KernDumpBase + KASLR_Slide;
         }
     }
     k = (uint32_t *)(Kernel + Prelink_Base);
     for (off = 0; off < Prelink_Size - 4; off += 4, k++) {
         if (k[0] == 0x91010000 && k[1] == 0xD65F03C0) {
-            return off + Prelink_Base + KernDumpBase;
+            return off + Prelink_Base + KernDumpBase + KASLR_Slide;
         }
     }
     return 0;
@@ -785,7 +755,7 @@ uint64_t Find_allproc(void) {
         return 0;
     }
     
-    return val + KernDumpBase;
+    return val + KernDumpBase + KASLR_Slide;
 }
 
 uint64_t Find_copyout(void) {
@@ -808,7 +778,7 @@ uint64_t Find_copyout(void) {
         return 0;
     }
     
-    return start + KernDumpBase;
+    return start + KernDumpBase + KASLR_Slide;
 }
 
 uint64_t Find_bzero(void) {
@@ -828,7 +798,7 @@ uint64_t Find_bzero(void) {
         return 0;
     }
     
-    return start + KernDumpBase;
+    return start + KernDumpBase + KASLR_Slide;
 }
 
 addr_t Find_bcopy(void) {
@@ -839,13 +809,13 @@ addr_t Find_bcopy(void) {
     k = (uint32_t *)(Kernel + XNUCore_Base);
     for (off = 0; off < XNUCore_Size - 4; off += 4, k++) {
         if (k[0] == 0xAA0003E3 && k[1] == 0xAA0103E0 && k[2] == 0xAA0303E1 && k[3] == 0xd503201F) {
-            return off + XNUCore_Base + KernDumpBase;
+            return off + XNUCore_Base + KernDumpBase + KASLR_Slide;
         }
     }
     k = (uint32_t *)(Kernel + Prelink_Base);
     for (off = 0; off < Prelink_Size - 4; off += 4, k++) {
         if (k[0] == 0xAA0003E3 && k[1] == 0xAA0103E0 && k[2] == 0xAA0303E1 && k[3] == 0xd503201F) {
-            return off + Prelink_Base + KernDumpBase;
+            return off + Prelink_Base + KernDumpBase + KASLR_Slide;
         }
     }
     return 0;
@@ -905,7 +875,7 @@ uint64_t Find_rootvnode(void) {
         return 0;
     }
     
-    return val + KernDumpBase;
+    return val + KernDumpBase + KASLR_Slide;
 }
 
 
@@ -958,6 +928,61 @@ addr_t Find_vnode_lookup() {
         return 0;
     }
     
+    return func + KernDumpBase + KASLR_Slide;
+}
+
+// this is so bad ik
+addr_t Find_vfs_context_current(void) {
+    uint64_t string = Find_strref("apfs_vnop_renamex", 5, 0, true);
+    if (!string) {
+        return 0;
+    }
+    string -= KernDumpBase;
+    
+    uint64_t call = Step64_back(Kernel, string, 100, INSN_CALL);
+    if (!call) {
+        return 0;
+    }
+    
+    uint64_t call2 = Step64_back(Kernel, call - 4, 100, INSN_CALL);
+    if (!call2) {
+        return 0;
+    }
+    
+    uint64_t func = Follow_call64(Kernel, call2);
+    if (!func) {
+        return 0;
+    }
+    return func + KernDumpBase + KASLR_Slide;
+}
+
+// strictly for new kernelcache formats. on older ones find string in prelink section instead
+addr_t Find_vnode_put(void) {
+    uint64_t str = Find_strref("%s:%d: UNSET root_to_xid - on next boot, volume will root to liv", 1, 0, false);
+    if (!str) {
+        return 0;
+    }
+    str -= KernDumpBase;
+    
+    uint64_t call = Step64(Kernel, str, 100, INSN_CALL);
+    if (!call) {
+        return 0;
+    }
+    
+    uint64_t call2 = Step64(Kernel, call + 4, 100, INSN_CALL);
+    if (!call2) {
+        return 0;
+    }
+    
+    uint64_t call3 = Step64(Kernel, call2 + 4, 100, INSN_CALL);
+    if (!call3) {
+        return 0;
+    }
+    
+    uint64_t func = Follow_call64(Kernel, call3);
+    if (!func) {
+        return 0;
+    }
     return func + KernDumpBase;
 }
 
@@ -1026,9 +1051,9 @@ addr_t Find_trustcache(void) {
         if (!val) {
             return 0;
         }
-        return val + KernDumpBase;
+        return val + KernDumpBase + KASLR_Slide;
     }
-    return val + KernDumpBase;
+    return val + KernDumpBase + KASLR_Slide;
 }
 
 addr_t Find_amficache() {
@@ -1104,7 +1129,7 @@ okay:
         
         val = Calc64(Kernel, call, call + 6*4, 21);
     }
-    return val + KernDumpBase;
+    return val + KernDumpBase + KASLR_Slide;
 }
 
 
@@ -1142,7 +1167,7 @@ addr_t Find_zone_map_ref(void) {
     
     val += ((*insn >> 10) & 0xFFF) << 3;
     
-    return val;
+    return val + KASLR_Slide;
 }
 
 addr_t Find_OSBoolean_True() {
@@ -1185,7 +1210,7 @@ addr_t Find_OSBoolean_True() {
         return 0;
     }
     
-    return KernelRead_64bits(val + KernDumpBase);
+    return KernelRead_64bits(val + KernDumpBase + KASLR_Slide);
 }
 
 addr_t Find_OSBoolean_False() {
@@ -1204,7 +1229,7 @@ addr_t Find_osunserializexml() {
         return 0;
     }
     
-    return start + KernDumpBase;
+    return start + KernDumpBase + KASLR_Slide;
 }
 
 addr_t Find_smalloc() {
@@ -1225,7 +1250,7 @@ addr_t Find_smalloc() {
         }
     }
     
-    return start + KernDumpBase;
+    return start + KernDumpBase + KASLR_Slide;
 }
 
 addr_t Find_sbops() {
@@ -1237,7 +1262,7 @@ addr_t Find_sbops() {
     what = str - Kernel + KernDumpBase;
     for (off = 0; off < Kernel_size - Prelink_Base; off += 8) {
         if (*(uint64_t *)(Kernel + Prelink_Base + off) == what) {
-            return *(uint64_t *)(Kernel + Prelink_Base + off + 24);
+            return *(uint64_t *)(Kernel + Prelink_Base + off + 24) + KASLR_Slide;
         }
     }
     return 0;
@@ -1310,7 +1335,7 @@ uint64_t Find_bootargs(void) {
     // don't ask, I wrote this at 5am
     val += (*insn<<9 & 0x1ffffc000) | (*insn>>17 & 0x3000);
     
-    return val;
+    return val + KASLR_Slide;
 }
 
 addr_t Find_kernel_map() {
@@ -1338,5 +1363,5 @@ addr_t Find_kernel_map() {
         return 0;
     }
     
-    return (*(uint64_t *)(Kernel + val)) ? *(uint64_t *)(Kernel + val) : val + KernDumpBase;
+    return (*(uint64_t *)(Kernel + val)) ? *(uint64_t *)(Kernel + val) : val + KernDumpBase + KASLR_Slide;
 }

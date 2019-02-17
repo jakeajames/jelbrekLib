@@ -17,3 +17,6 @@ uint64_t Find_osunserializexml(void);
 uint64_t Find_smalloc(void);
 uint64_t Find_sbops(void);
 uint64_t Find_bootargs(void);
+uint64_t Find_vfs_context_current(void);
+uint64_t Find_vnode_lookup(void);
+uint64_t Find_vnode_put(void);

@@ -349,7 +349,6 @@ uint64_t Find_bcopy(void);
 uint64_t Find_rootvnode(void);
 uint64_t Find_trustcache(void);
 uint64_t Find_amficache(void);
-uint64_t Find_amficache(void);
 uint64_t Find_OSBoolean_True(void);
 uint64_t Find_OSBoolean_False(void);
 uint64_t Find_zone_map_ref(void);
@@ -357,6 +356,9 @@ uint64_t Find_osunserializexml(void);
 uint64_t Find_smalloc(void);
 uint64_t Find_sbops(void);
 uint64_t Find_bootargs(void);
+uint64_t Find_vfs_context_current(void);
+uint64_t Find_vnode_lookup(void);
+uint64_t Find_vnode_put(void);
 
 /*
  Purpose:

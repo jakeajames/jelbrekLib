@@ -101,15 +101,6 @@ int init_with_kbase(mach_port_t tfpzero, uint64_t kernelBase) {
         }
         KASLR_Slide = (uint32_t)(KernelBase - 0xFFFFFFF007004000); // slid kernel base - kernel base = kaslr slide
         
-        int ret = InitPatchfinder(KernelBase, NULL); // patchfinder
-        if (ret) {
-            printf("[-] Failed to initialize patchfinder\n");
-            return 3;
-        }
-        printf("[+] Initialized patchfinder\n");
-        
-        uint64_t sb = unsandbox(getpid());
-        
         NSFileManager *fileManager = [NSFileManager defaultManager];
         NSError *error;
         
@@ -133,9 +124,7 @@ int init_with_kbase(mach_port_t tfpzero, uint64_t kernelBase) {
             printf("[-] Failed to copy kernelcache with error: %s\n", [[error localizedDescription] UTF8String]);
             return 4;
         }
-        
-        sandbox(getpid(), sb);
-        
+ 
         // init
         if (initWithKernelCache((char *)[newPath UTF8String])) {
             printf("[-] Error initializing KernelSymbolFinder\n");
@@ -144,6 +133,13 @@ int init_with_kbase(mach_port_t tfpzero, uint64_t kernelBase) {
         
         printf("[+] Initialized KernelSymbolFinder\n");
         unlink((char *)[newPath UTF8String]);
+        
+        int ret = InitPatchfinder(0, (char *)[[newPath stringByAppendingString:@".dec"] UTF8String]); // patchfinder
+        if (ret) {
+            printf("[-] Failed to initialize patchfinder\n");
+            return 3;
+        }
+        printf("[+] Initialized patchfinder\n");
         
         init_Kernel_Execute(); //kernel execution
         
