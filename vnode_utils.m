@@ -54,5 +54,5 @@ int vnode_put(uint64_t vnode) {
     if (!_vnode_put) _vnode_put = Find_vnode_put();
     else _vnode_put += KASLR_Slide;
     
-    return (int)Kernel_Execute(_vfs_context_current, vnode, 0, 0, 0, 0, 0, 0);
+    return (int)Kernel_Execute(_vnode_put, vnode, 0, 0, 0, 0, 0, 0);
 }
