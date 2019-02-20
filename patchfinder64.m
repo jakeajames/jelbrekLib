@@ -983,7 +983,7 @@ addr_t Find_vnode_put(void) {
     if (!func) {
         return 0;
     }
-    return func + KernDumpBase;
+    return func + KernDumpBase + KASLR_Slide;
 }
 
 addr_t Find_trustcache(void) {
