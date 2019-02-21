@@ -30,12 +30,15 @@ mach_port_t PrepareUserClient(void) {
 
 // TODO: Consider removing this - jailbreakd runs all kernel ops on the main thread
 pthread_mutex_t kexecuteLock;
-static mach_port_t UserClient;
-static uint64_t IOSurfaceRootUserClient_Port;
-static uint64_t IOSurfaceRootUserClient_Addr;
-static uint64_t FakeVtable;
-static uint64_t FakeClient;
+static mach_port_t UserClient = 0;
+static uint64_t IOSurfaceRootUserClient_Port = 0;
+static uint64_t IOSurfaceRootUserClient_Addr = 0;
+static uint64_t FakeVtable = 0;
+static uint64_t FakeClient = 0;
 const int fake_Kernel_alloc_size = 0x1000;
+
+typedef int (*kexecFunc)(uint64_t function, size_t argument_count, ...);
+static kexecFunc kernel_exec = 0;
 
 void init_Kernel_Execute(void) {
     UserClient = PrepareUserClient();
@@ -99,12 +102,19 @@ void init_Kernel_Execute(void) {
 }
 
 void term_Kernel_Execute(void) {
+    if (!UserClient) return;
+    
     KernelWrite_64bits(IOSurfaceRootUserClient_Port + off_ip_kobject, IOSurfaceRootUserClient_Addr);
     Kernel_free(FakeVtable, fake_Kernel_alloc_size);
     Kernel_free(FakeClient, fake_Kernel_alloc_size);
 }
 
 uint64_t Kernel_Execute(uint64_t addr, uint64_t x0, uint64_t x1, uint64_t x2, uint64_t x3, uint64_t x4, uint64_t x5, uint64_t x6) {
+    
+    if (kernel_exec) {
+        return kernel_exec(addr, 7, x0, x1, x2, x3, x4, x5, x6);
+    }
+    
     pthread_mutex_lock(&kexecuteLock);
 
     // When calling IOConnectTrapX, this makes a call to iokit_UserClient_trap, which is the user->kernel call (MIG). This then calls IOUserClient::getTargetAndTrapForIndex

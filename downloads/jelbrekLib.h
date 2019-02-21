@@ -13,8 +13,9 @@ extern mach_port_t TFP0;
     3: patchfinder didn't initialize properly
     4: kernelSymbolFinder didn't initialize properly
  */
+typedef int (*kexecFunc)(uint64_t Address, uint64_t Len, void *From);
 int init_jelbrek(mach_port_t tfpzero);
-int init_with_kbase(mach_port_t tfpzero, uint64_t kernelBase); // iOS 12
+int init_with_kbase(mach_port_t tfpzero, uint64_t kernelBase, kexecFunc kexec); // iOS 12
 
 /*
  Purpose: Free memory used by jelbrekLib & clean up (last thing you have to call)
