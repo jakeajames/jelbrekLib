@@ -1476,10 +1476,11 @@ addr_t Find_sysctl_unregister_oid() {
     }
     return call + KernDumpBase;
 }
+
 addr_t Find_mov_x0_x4__br_x5() {
     uint32_t bytes[] = {  0xaa0403e0, // mov x0, x4
-        0xd61f00a0  // br x5
-    };
+                          0xd61f00a0  // br x5
+                       };
     
     uint64_t addr = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)((uint64_t)Kernel + XNUCore_Base), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
     if (!addr) {
@@ -1491,8 +1492,8 @@ addr_t Find_mov_x0_x4__br_x5() {
 
 addr_t Find_mov_x9_x0__br_x1() {
     uint32_t bytes[] = {  0xaa0003e9, // mov x9, x0
-        0xd61f0020  // br x1
-    };
+                          0xd61f0020  // br x1
+                       };
     
     uint64_t addr = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)((uint64_t)Kernel + XNUCore_Base), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
     if (!addr) {
@@ -1504,8 +1505,8 @@ addr_t Find_mov_x9_x0__br_x1() {
 
 addr_t Find_mov_x10_x3__br_x6() {
     uint32_t bytes[] = {  0xaa0303ea, // mov x10, x3
-        0xd61f00c0  // br x6
-    };
+                          0xd61f00c0  // br x6
+                       };
     
     uint64_t addr = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)((uint64_t)Kernel + XNUCore_Base), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
     if (!addr) {
@@ -1518,8 +1519,8 @@ addr_t Find_mov_x10_x3__br_x6() {
 addr_t Find_kernel_forge_pacia_gadget() {
     
     uint32_t bytes[] = {  0xdac10149, // paci
-        0xf9007849  // str x9, [x2, #240]
-    };
+                          0xf9007849  // str x9, [x2, #240]
+                       };
     
     uint64_t addr = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)((uint64_t)Kernel + XNUCore_Base), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
     if (!addr) {
@@ -1532,8 +1533,8 @@ addr_t Find_kernel_forge_pacia_gadget() {
 addr_t Find_kernel_forge_pacda_gadget() {
     
     uint32_t bytes[] = {  0xdac10949, // pacd x9
-        0xf9007449  // str x9, [x2, #232]
-    };
+                          0xf9007449  // str x9, [x2, #232]
+                      };
     
     uint64_t addr = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)((uint64_t)Kernel + XNUCore_Base), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
     if (!addr) {
