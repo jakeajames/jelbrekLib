@@ -1571,3 +1571,29 @@ addr_t Find_IOUserClient_vtable() {
     
     return vtable + KernDumpBase;
 }
+
+addr_t Find_IORegistryEntry__getRegistryEntryID() {
+    
+    uint32_t bytes[] = {  0xf9400808, // ldr x8, [x0, #0x10]
+                       };
+    
+    uint64_t addr = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)((uint64_t)Kernel + XNUCore_Base), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
+    if (!addr) {
+        return 0;
+    }
+    
+    // basically just look the instructions
+    // can't find a better way
+    // this was not done like the previous gadgets because an address is being used, which won't be the same between devices so can't be hardcoded and i gotta use masks
+    
+    // cbz x8, SOME_ADDRESS <= where we do masking (((*(uint32_t *)(addr + 4)) & 0xFC000000) != 0xb4000000)
+    // ldr x0, [x8, #8]     <= 2nd part of 0xd65f03c0f9400500
+    // ret                  <= 1st part of 0xd65f03c0f9400500
+  
+    while ((((*(uint32_t *)(addr + 4)) & 0xFC000000) != 0xb4000000) || (*(uint64_t*)(addr + 8) != 0xd65f03c0f9400500)) {
+        addr = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)(addr + 4), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
+        printf("now!\n");
+    }
+    
+    return 0;
+}
