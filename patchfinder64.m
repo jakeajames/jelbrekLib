@@ -1594,6 +1594,6 @@ addr_t Find_IORegistryEntry__getRegistryEntryID() {
         addr = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)(addr + 4), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
         printf("now!\n");
     }
-    
-    return 0;
+  
+    return addr + KernDumpBase - (uint64_t)Kernel;;
 }
