@@ -1567,7 +1567,7 @@ addr_t Find_IOUserClient_vtable() {
         return 0;
     }
     
-    vtable -= 0x10;
+    //vtable -= 0x10;
     
     return vtable + KernDumpBase;
 }
