@@ -453,10 +453,10 @@ static addr_t PString_base = 0;
 static addr_t PString_size = 0;
 static addr_t OSLog_base = 0;
 static addr_t OSLog_size = 0;
-static addr_t data_base = 0;
-static addr_t data_size = 0;
-static addr_t data_const_base = 0;
-static addr_t data_const_size = 0;
+static addr_t Data_base = 0;
+static addr_t Data_size = 0;
+static addr_t Data_const_base = 0;
+static addr_t Data_const_size = 0;
 static addr_t KernDumpBase = -1;
 static addr_t Kernel_entry = 0;
 static void *Kernel_mh = 0;
@@ -505,13 +505,31 @@ InitPatchfinder(addr_t base, const char *filename)
             if (max < seg->vmaddr + seg->vmsize) {
                 max = seg->vmaddr + seg->vmsize;
             }
-            if (!strcmp(seg->segname, "__TEXT_EXEC")) {
+            else if (!strcmp(seg->segname, "__TEXT_EXEC")) {
                 XNUCore_Base = seg->vmaddr;
                 XNUCore_Size = seg->filesize;
             }
-            if (!strcmp(seg->segname, "__PLK_TEXT_EXEC")) {
+            else if (!strcmp(seg->segname, "__PLK_TEXT_EXEC")) {
                 Prelink_Base = seg->vmaddr;
                 Prelink_Size = seg->filesize;
+            }
+            else if (!strcmp(seg->segname, "__DATA_CONST")) {
+                const struct section_64 *sec = (struct section_64 *)(seg + 1);
+                for (j = 0; j < seg->nsects; j++) {
+                    if (!strcmp(sec[j].sectname, "__const")) {
+                        Data_const_base = sec[j].addr;
+                        Data_const_size = sec[j].size;
+                    }
+                }
+            }
+            else if (!strcmp(seg->segname, "__DATA")) {
+                const struct section_64 *sec = (struct section_64 *)(seg + 1);
+                for (j = 0; j < seg->nsects; j++) {
+                    if (!strcmp(sec[j].sectname, "__data")) {
+                        Data_base = sec[j].addr;
+                        Data_size = sec[j].size;
+                    }
+                }
             }
             if (!strcmp(seg->segname, "__TEXT")) {
                 const struct section_64 *sec = (struct section_64 *)(seg + 1);
@@ -563,6 +581,8 @@ InitPatchfinder(addr_t base, const char *filename)
     CString_base -= KernDumpBase;
     PString_base -= KernDumpBase;
     OSLog_base -= KernDumpBase;
+    Data_base -= KernDumpBase;
+    Data_size -= KernDumpBase;
     Kernel_size = max - min;
     
     Kernel = calloc(1, Kernel_size);
@@ -681,6 +701,10 @@ Find_strref(const char *string, int n, int type, bool exactMatch)
     else if (type == 1) {
         base = PString_base;
         size = PString_size;
+    }
+    else if (type == 2) {
+        base = Data_base;
+        size = Data_size;
     }
     else {
         base = OSLog_base;
@@ -1364,4 +1388,30 @@ addr_t Find_kernel_map() {
     }
     
     return (*(uint64_t *)(Kernel + val)) ? *(uint64_t *)(Kernel + val) : val + KernDumpBase + KASLR_Slide;
+}
+
+addr_t Find_module_start() {
+    uint64_t string = (uint64_t)Boyermoore_horspool_memmem(Kernel + Data_base, Data_size, (const unsigned char *)"com.apple.driver.AppleSynopsysOTGDevice", strlen("com.apple.driver.AppleSynopsysOTGDevice")) - (uint64_t)Kernel;
+    if (!string) {
+        return  0;
+    }
+    
+    // uint64_t val = *(uint64_t*)(string + (uint64_t)Kernel - 0x20);
+    // not sure if this is constant among all devices if (val == 0x8010000001821088) return string + KernDumpBase - 0x20;
+    // return 0;
+    
+    return string + KernDumpBase - 0x20;
+}
+
+addr_t Find_module_stop() {
+    uint64_t string = (uint64_t)Boyermoore_horspool_memmem(Kernel + Data_base, Data_size, (const unsigned char *)"com.apple.driver.AppleSynopsysOTGDevice", strlen("com.apple.driver.AppleSynopsysOTGDevice")) - (uint64_t)Kernel;
+    if (!string) {
+        return  0;
+    }
+    
+    // uint64_t val = *(uint64_t*)(string + (uint64_t)Kernel - 0x20);
+    // not sure if this is constant among all devices if (val == 0x8178000001821180) return string + KernDumpBase - 0x18;
+    // return 0;
+    
+    return string + KernDumpBase - 0x18;
 }
