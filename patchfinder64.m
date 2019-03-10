@@ -1405,7 +1405,7 @@ addr_t Find_l2tp_domain_module_start() {
     // not sure if this is constant among all devices if (val == 0x8010000001821088) return string + KernDumpBase - 0x20;
     // return 0;
     
-    return string + KernDumpBase - 0x20;
+    return string + KernDumpBase - 0x20 + KASLR_Slide;
 }
 
 addr_t Find_l2tp_domain_module_stop() {
@@ -1418,7 +1418,7 @@ addr_t Find_l2tp_domain_module_stop() {
     // not sure if this is constant among all devices if (val == 0x8178000001821180) return string + KernDumpBase - 0x18;
     // return 0;
     
-    return string + KernDumpBase - 0x18;
+    return string + KernDumpBase - 0x18 + KASLR_Slide;
 }
 
 addr_t Find_l2tp_domain_inited() {
@@ -1433,7 +1433,7 @@ addr_t Find_l2tp_domain_inited() {
         return 0;
     }
     
-    return addr + KernDumpBase;
+    return addr + KernDumpBase + KASLR_Slide;
 }
 
 addr_t Find_sysctl_net_ppp_l2tp() {
@@ -1449,7 +1449,7 @@ addr_t Find_sysctl_net_ppp_l2tp() {
         return 0;
     }
     
-    return addr + KernDumpBase;
+    return addr + KernDumpBase + KASLR_Slide;
 }
 
 addr_t Find_sysctl_unregister_oid() {
@@ -1474,8 +1474,9 @@ addr_t Find_sysctl_unregister_oid() {
     if (!call) {
         return 0;
     }
-    return call + KernDumpBase;
+    return call + KernDumpBase + KASLR_Slide;
 }
+
 addr_t Find_mov_x0_x4__br_x5() {
     uint32_t bytes[] = {
         0xaa0403e0, // mov x0, x4
@@ -1487,7 +1488,7 @@ addr_t Find_mov_x0_x4__br_x5() {
         return 0;
     }
     
-    return addr - (uint64_t)Kernel + KernDumpBase;
+    return addr - (uint64_t)Kernel + KernDumpBase + KASLR_Slide;
 }
 
 addr_t Find_mov_x9_x0__br_x1() {
@@ -1501,7 +1502,7 @@ addr_t Find_mov_x9_x0__br_x1() {
         return 0;
     }
     
-    return addr - (uint64_t)Kernel + KernDumpBase;
+    return addr - (uint64_t)Kernel + KernDumpBase + KASLR_Slide;
 }
 
 addr_t Find_mov_x10_x3__br_x6() {
@@ -1515,7 +1516,7 @@ addr_t Find_mov_x10_x3__br_x6() {
         return 0;
     }
     
-    return addr - (uint64_t)Kernel + KernDumpBase;
+    return addr - (uint64_t)Kernel + KernDumpBase + KASLR_Slide;
 }
 
 addr_t Find_kernel_forge_pacia_gadget() {
@@ -1530,7 +1531,7 @@ addr_t Find_kernel_forge_pacia_gadget() {
         return 0;
     }
     
-    return addr - (uint64_t)Kernel + KernDumpBase;
+    return addr - (uint64_t)Kernel + KernDumpBase + KASLR_Slide;
 }
 
 addr_t Find_kernel_forge_pacda_gadget() {
