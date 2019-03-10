@@ -1476,3 +1476,43 @@ addr_t Find_sysctl_unregister_oid() {
     }
     return call + KernDumpBase;
 }
+
+addr_t Find_mov_x0_x4__br_x5() {
+    uint32_t bytes[2] = { 0xaa0403e0, // mov x0, x4
+                          0xd61f00a0  // br x5
+                        };
+    
+    uint64_t addr = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)((uint64_t)Kernel + XNUCore_Base), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
+    if (!addr) {
+        return 0;
+    }
+    
+    return addr - (uint64_t)Kernel + KernDumpBase;
+}
+
+addr_t Find_mov_x9_x0__br_x1() {
+    uint32_t bytes[2] = { 0xaa0003e9, // mov x9, x0
+                          0xd61f0020  // br x1
+                        };
+    
+    uint64_t addr = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)((uint64_t)Kernel + XNUCore_Base), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
+    if (!addr) {
+        return 0;
+    }
+    
+    return addr - (uint64_t)Kernel + KernDumpBase;
+}
+
+addr_t Find_mov_x10_x3__br_x6() {
+    uint32_t bytes[2] = { 0xaa0303ea, // mov x10, x3
+                          0xd61f00c0  // br x6
+                        };
+    
+    uint64_t addr = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)((uint64_t)Kernel + XNUCore_Base), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
+    if (!addr) {
+        return 0;
+    }
+    
+    return addr - (uint64_t)Kernel + KernDumpBase;
+}
+
