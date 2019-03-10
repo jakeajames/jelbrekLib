@@ -367,6 +367,11 @@ Calc64(const uint8_t *buf, addr_t start, addr_t end, int which)
             //printf("%llx: LDR X%d, [X%d, 0x%x]\n", i, reg, rn, imm);
             if (!imm) continue;            // XXX not counted as true xref
             value[reg] = value[rn] + imm;    // XXX address, not actual value
+        } else if ((op & 0xF9C00000) == 0xb9400000) { // 32bit
+            unsigned rn = (op >> 5) & 0x1F;
+            unsigned imm = ((op >> 10) & 0xFFF) << 2;
+            if (!imm) continue;            // XXX not counted as true xref
+            value[reg] = value[rn] + imm;    // XXX address, not actual value
         } else if ((op & 0xF9C00000) == 0xF9000000) {
             unsigned rn = (op >> 5) & 0x1F;
             unsigned imm = ((op >> 10) & 0xFFF) << 3;
@@ -1415,3 +1420,19 @@ addr_t Find_module_stop() {
     
     return string + KernDumpBase - 0x18;
 }
+
+addr_t Find_domain_inited() {
+    uint64_t ref = Find_strref("L2TP domain init\n", 1, 0, true);
+    if (!ref) {
+        return 0;
+    }
+    ref -= KernDumpBase;
+    
+    uint64_t addr = Calc64(Kernel, ref, ref + 32, 8);
+    if (!addr) {
+        return 0;
+    }
+    
+    return addr + KernDumpBase;
+}
+
