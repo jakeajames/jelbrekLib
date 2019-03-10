@@ -531,7 +531,7 @@ InitPatchfinder(addr_t base, const char *filename)
                     }
                 }
             }
-            if (!strcmp(seg->segname, "__TEXT")) {
+            else if (!strcmp(seg->segname, "__TEXT")) {
                 const struct section_64 *sec = (struct section_64 *)(seg + 1);
                 for (j = 0; j < seg->nsects; j++) {
                     if (!strcmp(sec[j].sectname, "__cstring")) {
@@ -544,7 +544,7 @@ InitPatchfinder(addr_t base, const char *filename)
                     }
                 }
             }
-            if (!strcmp(seg->segname, "__PRELINK_TEXT")) {
+            else if (!strcmp(seg->segname, "__PRELINK_TEXT")) {
                 const struct section_64 *sec = (struct section_64 *)(seg + 1);
                 for (j = 0; j < seg->nsects; j++) {
                     if (!strcmp(sec[j].sectname, "__text")) {
@@ -553,11 +553,11 @@ InitPatchfinder(addr_t base, const char *filename)
                     }
                 }
             }
-            if (!strcmp(seg->segname, "__LINKEDIT")) {
+            else if (!strcmp(seg->segname, "__LINKEDIT")) {
                 Kernel_delta = seg->vmaddr - min - seg->fileoff;
             }
         }
-        if (cmd->cmd == LC_UNIXTHREAD) {
+        else if (cmd->cmd == LC_UNIXTHREAD) {
             uint32_t *ptr = (uint32_t *)(cmd + 1);
             uint32_t flavor = ptr[0];
             struct {
