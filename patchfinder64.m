@@ -587,7 +587,7 @@ InitPatchfinder(addr_t base, const char *filename)
     PString_base -= KernDumpBase;
     OSLog_base -= KernDumpBase;
     Data_base -= KernDumpBase;
-    Data_size -= KernDumpBase;
+    Data_const_base -= KernDumpBase;
     Kernel_size = max - min;
     
     Kernel = calloc(1, Kernel_size);
@@ -1405,7 +1405,7 @@ addr_t Find_l2tp_domain_module_start() {
     // not sure if this is constant among all devices if (val == 0x8010000001821088) return string + KernDumpBase - 0x20;
     // return 0;
     
-    return string + KernDumpBase - 0x20 + KASLR_Slide;
+    return string + KernDumpBase - 0x20;
 }
 
 addr_t Find_l2tp_domain_module_stop() {
@@ -1418,7 +1418,7 @@ addr_t Find_l2tp_domain_module_stop() {
     // not sure if this is constant among all devices if (val == 0x8178000001821180) return string + KernDumpBase - 0x18;
     // return 0;
     
-    return string + KernDumpBase - 0x18 + KASLR_Slide;
+    return string + KernDumpBase - 0x18;
 }
 
 addr_t Find_l2tp_domain_inited() {
@@ -1433,7 +1433,7 @@ addr_t Find_l2tp_domain_inited() {
         return 0;
     }
     
-    return addr + KernDumpBase + KASLR_Slide;
+    return addr + KernDumpBase;
 }
 
 addr_t Find_sysctl_net_ppp_l2tp() {
@@ -1449,7 +1449,7 @@ addr_t Find_sysctl_net_ppp_l2tp() {
         return 0;
     }
     
-    return addr + KernDumpBase + KASLR_Slide;
+    return addr + KernDumpBase;
 }
 
 addr_t Find_sysctl_unregister_oid() {
@@ -1474,67 +1474,71 @@ addr_t Find_sysctl_unregister_oid() {
     if (!call) {
         return 0;
     }
-    return call + KernDumpBase + KASLR_Slide;
+    return call + KernDumpBase;
 }
-
 addr_t Find_mov_x0_x4__br_x5() {
-    uint32_t bytes[] = {  0xaa0403e0, // mov x0, x4
-                          0xd61f00a0  // br x5
-                       };
+    uint32_t bytes[] = {
+        0xaa0403e0, // mov x0, x4
+        0xd61f00a0  // br x5
+    };
     
     uint64_t addr = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)((uint64_t)Kernel + XNUCore_Base), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
     if (!addr) {
         return 0;
     }
     
-    return addr - (uint64_t)Kernel + KernDumpBase + KASLR_Slide;
+    return addr - (uint64_t)Kernel + KernDumpBase;
 }
 
 addr_t Find_mov_x9_x0__br_x1() {
-    uint32_t bytes[] = {  0xaa0003e9, // mov x9, x0
-                          0xd61f0020  // br x1
-                       };
+    uint32_t bytes[] = {
+        0xaa0003e9, // mov x9, x0
+        0xd61f0020  // br x1
+    };
     
     uint64_t addr = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)((uint64_t)Kernel + XNUCore_Base), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
     if (!addr) {
         return 0;
     }
     
-    return addr - (uint64_t)Kernel + KernDumpBase + KASLR_Slide;
+    return addr - (uint64_t)Kernel + KernDumpBase;
 }
 
 addr_t Find_mov_x10_x3__br_x6() {
-    uint32_t bytes[] = {  0xaa0303ea, // mov x10, x3
-                          0xd61f00c0  // br x6
-                       };
+    uint32_t bytes[] = {
+        0xaa0303ea, // mov x10, x3
+        0xd61f00c0  // br x6
+    };
     
     uint64_t addr = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)((uint64_t)Kernel + XNUCore_Base), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
     if (!addr) {
         return 0;
     }
     
-    return addr - (uint64_t)Kernel + KernDumpBase + KASLR_Slide;
+    return addr - (uint64_t)Kernel + KernDumpBase;
 }
 
 addr_t Find_kernel_forge_pacia_gadget() {
     
-    uint32_t bytes[] = {  0xdac10149, // paci
-                          0xf9007849  // str x9, [x2, #240]
-                       };
+    uint32_t bytes[] = {
+        0xdac10149, // paci
+        0xf9007849  // str x9, [x2, #240]
+    };
     
     uint64_t addr = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)((uint64_t)Kernel + XNUCore_Base), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
     if (!addr) {
         return 0;
     }
     
-    return addr - (uint64_t)Kernel + KernDumpBase + KASLR_Slide;
+    return addr - (uint64_t)Kernel + KernDumpBase;
 }
 
 addr_t Find_kernel_forge_pacda_gadget() {
     
-    uint32_t bytes[] = {  0xdac10949, // pacd x9
-                          0xf9007449  // str x9, [x2, #232]
-                      };
+    uint32_t bytes[] = {
+        0xdac10949, // pacd x9
+        0xf9007449  // str x9, [x2, #232]
+    };
     
     uint64_t addr = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)((uint64_t)Kernel + XNUCore_Base), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
     if (!addr) {
@@ -1574,8 +1578,9 @@ addr_t Find_IOUserClient_vtable() {
 
 addr_t Find_IORegistryEntry__getRegistryEntryID() {
     
-    uint32_t bytes[] = {  0xf9400808, // ldr x8, [x0, #0x10]
-                       };
+    uint32_t bytes[] = {
+        0xf9400808, // ldr x8, [x0, #0x10]
+    };
     
     uint64_t addr = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)((uint64_t)Kernel + XNUCore_Base), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
     if (!addr) {
@@ -1589,10 +1594,10 @@ addr_t Find_IORegistryEntry__getRegistryEntryID() {
     // cbz x8, SOME_ADDRESS <= where we do masking (((*(uint32_t *)(addr + 4)) & 0xFC000000) != 0xb4000000)
     // ldr x0, [x8, #8]     <= 2nd part of 0xd65f03c0f9400500
     // ret                  <= 1st part of 0xd65f03c0f9400500
-  
+    
     while ((((*(uint32_t *)(addr + 4)) & 0xFC000000) != 0xb4000000) || (*(uint64_t*)(addr + 8) != 0xd65f03c0f9400500)) {
         addr = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)(addr + 4), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
     }
-  
+    
     return addr + KernDumpBase - (uint64_t)Kernel + KASLR_Slide;
 }
