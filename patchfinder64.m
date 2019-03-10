@@ -1543,3 +1543,31 @@ addr_t Find_kernel_forge_pacda_gadget() {
     
     return addr - (uint64_t)Kernel + KernDumpBase;
 }
+
+addr_t Find_IOUserClient_vtable() {
+    uint64_t ref1 = Find_strref("IOUserClient", 2, 0, true);
+    if (!ref1) {
+        return 0;
+    }
+    ref1 -= KernDumpBase;
+    
+    uint64_t ref2 = Find_strref("IOUserClient", 3, 0, true);
+    if (!ref2) {
+        return 0;
+    }
+    ref2 -= KernDumpBase;
+    
+    uint64_t func2 = BOF64(Kernel, XNUCore_Base, ref2);
+    if (!func2) {
+        return 0;
+    }
+    
+    uint64_t vtable = Calc64(Kernel, ref1, func2, 8);
+    if (!vtable) {
+        return 0;
+    }
+    
+    vtable -= 0x10;
+    
+    return vtable + KernDumpBase;
+}
