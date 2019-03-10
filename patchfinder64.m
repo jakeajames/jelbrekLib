@@ -1395,7 +1395,7 @@ addr_t Find_kernel_map() {
     return (*(uint64_t *)(Kernel + val)) ? *(uint64_t *)(Kernel + val) : val + KernDumpBase + KASLR_Slide;
 }
 
-addr_t Find_module_start() {
+addr_t Find_l2tp_domain_module_start() {
     uint64_t string = (uint64_t)Boyermoore_horspool_memmem(Kernel + Data_base, Data_size, (const unsigned char *)"com.apple.driver.AppleSynopsysOTGDevice", strlen("com.apple.driver.AppleSynopsysOTGDevice")) - (uint64_t)Kernel;
     if (!string) {
         return  0;
@@ -1408,7 +1408,7 @@ addr_t Find_module_start() {
     return string + KernDumpBase - 0x20;
 }
 
-addr_t Find_module_stop() {
+addr_t Find_l2tp_domain_module_stop() {
     uint64_t string = (uint64_t)Boyermoore_horspool_memmem(Kernel + Data_base, Data_size, (const unsigned char *)"com.apple.driver.AppleSynopsysOTGDevice", strlen("com.apple.driver.AppleSynopsysOTGDevice")) - (uint64_t)Kernel;
     if (!string) {
         return  0;
@@ -1421,7 +1421,7 @@ addr_t Find_module_stop() {
     return string + KernDumpBase - 0x18;
 }
 
-addr_t Find_domain_inited() {
+addr_t Find_l2tp_domain_inited() {
     uint64_t ref = Find_strref("L2TP domain init\n", 1, 0, true);
     if (!ref) {
         return 0;
@@ -1436,3 +1436,43 @@ addr_t Find_domain_inited() {
     return addr + KernDumpBase;
 }
 
+addr_t Find_sysctl_net_ppp_l2tp() {
+    uint64_t ref = Find_strref("L2TP domain terminate : PF_PPP domain does not exist...\n", 1, 0, true);
+    if (!ref) {
+        return 0;
+    }
+    ref -= KernDumpBase;
+    ref += 4;
+    
+    uint64_t addr = Calc64(Kernel, ref, ref + 28, 0);
+    if (!addr) {
+        return 0;
+    }
+    
+    return addr + KernDumpBase;
+}
+
+addr_t Find_sysctl_unregister_oid() {
+    uint64_t ref = Find_strref("L2TP domain terminate : PF_PPP domain does not exist...\n", 1, 0, true);
+    if (!ref) {
+        return 0;
+    }
+    ref -= KernDumpBase;
+    
+    uint64_t addr = Step64(Kernel, ref, 28, INSN_CALL);
+    if (!addr) {
+        return 0;
+    }
+    
+    addr += 4;
+    addr = Step64(Kernel, addr, 28, INSN_CALL);
+    if (!addr) {
+        return 0;
+    }
+    
+    uint64_t call = Follow_call64(Kernel, addr);
+    if (!call) {
+        return 0;
+    }
+    return call + KernDumpBase;
+}
