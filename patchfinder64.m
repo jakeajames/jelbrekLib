@@ -510,7 +510,8 @@ InitPatchfinder(addr_t base, const char *filename)
             if (max < seg->vmaddr + seg->vmsize) {
                 max = seg->vmaddr + seg->vmsize;
             }
-            else if (!strcmp(seg->segname, "__TEXT_EXEC")) {
+             
+            if (!strcmp(seg->segname, "__TEXT_EXEC")) {
                 XNUCore_Base = seg->vmaddr;
                 XNUCore_Size = seg->filesize;
             }
