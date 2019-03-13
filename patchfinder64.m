@@ -1083,8 +1083,8 @@ addr_t Find_trustcache(void) {
     uint64_t val = Calc64(Kernel, call, call + 24, 21);
     if (!val) {
         // iOS 12
-        ref = Find_strref("\"loadable trust cache buffer too small (%ld) for entries claimed (%d)\"", 1, 0, false);
-        if (!ref && PPLText_base) {
+        
+        if (PPLText_base) {
             // A12
             
             ref = Find_strref("\"loadable trust cache buffer too small (%ld) for entries claimed (%d)\"", 1, 4, false);
@@ -1101,6 +1101,10 @@ addr_t Find_trustcache(void) {
             
             return val + KernDumpBase;
         }
+        else {
+            ref = Find_strref("\"loadable trust cache buffer too small (%ld) for entries claimed (%d)\"", 1, 0, false);
+        }
+        
         if (!ref) {
             return 0;
         }
@@ -1118,7 +1122,7 @@ addr_t Find_trustcache(void) {
 addr_t Find_pmap_load_trust_cache() {
     uint64_t ref;
     
-    if (PPLText_Base) {
+    if (PPLText_base) {
         ref = Find_strref("\"loadable trust cache buffer too small (%ld) for entries claimed (%d)\"", 1, 4, false);
     }
     else {
@@ -1132,8 +1136,8 @@ addr_t Find_pmap_load_trust_cache() {
     ref -= KernDumpBase;
     
     uint64_t addr;
-    if (PPLText_Base) {
-        addr = BOF64(Kernel, PPLText_Base, ref);
+    if (PPLText_base) {
+        addr = BOF64(Kernel, PPLText_base, ref);
     }
     else {
         addr = BOF64(Kernel, XNUCore_Base, ref);
