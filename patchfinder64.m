@@ -237,6 +237,7 @@ BOF64(const uint8_t *buf, addr_t start, addr_t where)
 {
     for (; where >= start; where -= 4) {
         uint32_t op = *(uint32_t *)(buf + where);
+        
         if ((op & 0xFFC003FF) == 0x910003FD) {
             unsigned delta = (op >> 10) & 0xFFF;
             //printf("%x: ADD X29, SP, #0x%x\n", where, delta);
@@ -245,6 +246,7 @@ BOF64(const uint8_t *buf, addr_t start, addr_t where)
                 uint32_t au = *(uint32_t *)(buf + prev);
                 if ((au & 0xFFC003E0) == 0xA98003E0) {
                     //printf("%x: STP x, y, [SP,#-imm]!\n", prev);
+                    if (*(uint32_t *)(buf + prev - 4) == 0xd503237f) return prev - 4;
                     return prev;
                 }
                 // try something else
@@ -253,6 +255,7 @@ BOF64(const uint8_t *buf, addr_t start, addr_t where)
                     au = *(uint32_t *)(buf + where);
                     // SUB SP, SP, #imm
                     if ((au & 0xFFC003FF) == 0xD10003FF && ((au >> 10) & 0xFFF) == delta + 0x10) {
+                        if (*(uint32_t *)(buf + where - 4) == 0xd503237f) return where - 4;
                         return where;
                     }
                     // STP x, y, [SP,#imm]
@@ -265,6 +268,16 @@ BOF64(const uint8_t *buf, addr_t start, addr_t where)
         }
     }
     return 0;
+}
+
+static addr_t
+Follow_call64(const uint8_t *buf, addr_t call)
+{
+    long long w;
+    w = *(uint32_t *)(buf + call) & 0x3FFFFFF;
+    w <<= 64 - 26;
+    w >>= 64 - 26 - 2;
+    return call + w;
 }
 
 static addr_t
@@ -321,6 +334,16 @@ XREF64(const uint8_t *buf, addr_t start, addr_t end, addr_t what)
             //printf("%llx: LDR X%d, =0x%llx\n", i, reg, adr + i);
             value[reg] = adr + i;        // XXX address, not actual value
         }
+        else if ((op & 0xFC000000) == 0x94000000) {
+            if (Follow_call64(buf, i) == what) {
+                return i;
+            }
+        }
+        else if ((op & 0xFC000000) == 0x14000000) {
+            if (Follow_call64(buf, i) == what) {
+                return i;
+            }
+        }
         if (value[reg] == what) {
             return i;
         }
@@ -361,7 +384,11 @@ Calc64(const uint8_t *buf, addr_t start, addr_t end, int which)
             }
             //printf("%llx: ADD X%d, X%d, 0x%x\n", i, reg, rn, imm);
             value[reg] = value[rn] + imm;
-        } else if ((op & 0xF9C00000) == 0xF9400000) {
+        } else if ((op & 0xFF000000) == 0xd2000000) {
+            unsigned val = (op & 0x1fffe0) >> 5; // idk if this is really correct but works for our purpose
+            value[reg] = val;
+        }
+        else if ((op & 0xF9C00000) == 0xF9400000) {
             unsigned rn = (op >> 5) & 0x1F;
             unsigned imm = ((op >> 10) & 0xFFF) << 3;
             //printf("%llx: LDR X%d, [X%d, 0x%x]\n", i, reg, rn, imm);
@@ -419,16 +446,6 @@ static addr_t
 Find_call64(const uint8_t *buf, addr_t start, size_t length)
 {
     return Step64(buf, start, length, 0x94000000, 0xFC000000);
-}
-
-static addr_t
-Follow_call64(const uint8_t *buf, addr_t call)
-{
-    long long w;
-    w = *(uint32_t *)(buf + call) & 0x3FFFFFF;
-    w <<= 64 - 26;
-    w >>= 64 - 26 - 2;
-    return call + w;
 }
 
 static addr_t
@@ -1119,37 +1136,49 @@ addr_t Find_trustcache(void) {
     return val + KernDumpBase + KASLR_Slide;
 }
 
-addr_t Find_pmap_load_trust_cache() {
-    uint64_t ref;
+addr_t Find_pmap_load_trust_cache_ppl() {
+    uint32_t bytes[] = {
+        0xd538d08a, // mrs x10, tpidr_el1
+        0xb944714c, // ldr w12, [x10, #0x470]
+        0x1100058c, // add w12, [xw12, #1]
+        0xb904714c, // str w12, [x10, #0x470]
+    };
     
-    if (PPLText_base) {
-        ref = Find_strref("\"loadable trust cache buffer too small (%ld) for entries claimed (%d)\"", 1, 4, false);
+    uint64_t weird_function = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)((uint64_t)Kernel + XNUCore_Base), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
+    if (!weird_function) {
+        return 0;
     }
-    else {
-        ref = Find_strref("\"loadable trust cache buffer too small (%ld) for entries claimed (%d)\"", 1, 0, false);
+    weird_function -= (uint64_t)Kernel;
+    
+    uint64_t begin = BOF64(Kernel, XNUCore_Base, weird_function);
+    if (!begin) {
+        return 0;
     }
+    
+    int n = 1;
+    uint64_t ref;
+    uint64_t val;
+    
+    do {
+        ref = Find_reference(begin + KernDumpBase, n, 0);
+        ref -= KernDumpBase;
+        val = Calc64(Kernel, ref - 4, ref, 15);
+        n++;
+    }
+    while (val != 0x25);
     
     if (!ref) {
         return 0;
     }
     
-    ref -= KernDumpBase;
-    
-    uint64_t addr;
-    if (PPLText_base) {
-        addr = BOF64(Kernel, PPLText_base, ref);
-    }
-    else {
-        addr = BOF64(Kernel, XNUCore_Base, ref);
-    }
-    
-    if (!addr) {
+    uint64_t func = ref - 4;
+    uint64_t our_thing = Find_reference(func + KernDumpBase, 1, 0);
+    if (!our_thing) {
         return 0;
     }
     
-    return addr + KernDumpBase + KASLR_Slide;
+    return our_thing + KernDumpBase + KASLR_Slide;
 }
-
 
 addr_t Find_amficache() {
     uint64_t cbz, call, func, val;
