@@ -462,6 +462,9 @@ static addr_t Data_base = 0;
 static addr_t Data_size = 0;
 static addr_t Data_const_base = 0;
 static addr_t Data_const_size = 0;
+static addr_t PPLText_base = 0;
+static addr_t PPLText_size = 0;
+
 static addr_t KernDumpBase = -1;
 static addr_t Kernel_entry = 0;
 static void *Kernel_mh = 0;
@@ -510,10 +513,13 @@ InitPatchfinder(addr_t base, const char *filename)
             if (max < seg->vmaddr + seg->vmsize) {
                 max = seg->vmaddr + seg->vmsize;
             }
-             
             if (!strcmp(seg->segname, "__TEXT_EXEC")) {
                 XNUCore_Base = seg->vmaddr;
                 XNUCore_Size = seg->filesize;
+            }
+            else if (!strcmp(seg->segname, "__PPLTEXT")) {
+                PPLText_base = seg->vmaddr;
+                PPLText_size = seg->filesize;
             }
             else if (!strcmp(seg->segname, "__PLK_TEXT_EXEC")) {
                 Prelink_Base = seg->vmaddr;
@@ -589,6 +595,7 @@ InitPatchfinder(addr_t base, const char *filename)
     OSLog_base -= KernDumpBase;
     Data_base -= KernDumpBase;
     Data_const_base -= KernDumpBase;
+    PPLText_base -= KernDumpBase;
     Kernel_size = max - min;
     
     Kernel = calloc(1, Kernel_size);
@@ -678,6 +685,11 @@ Find_reference(addr_t to, int n, int type)
         size = Prelink_Size;
     }
     
+    if (type == 4) {
+        base = PPLText_base;
+        size = PPLText_size;
+    }
+    
     if (n <= 0) {
         n = 1;
     }
@@ -700,21 +712,21 @@ Find_strref(const char *string, int n, int type, bool exactMatch)
     uint8_t *str;
     addr_t base, size;
     
-    if (type == 0) {
-        base = CString_base;
-        size = CString_size;
-    }
-    else if (type == 1) {
+    if (type == 1) {
         base = PString_base;
         size = PString_size;
     }
     else if (type == 2) {
+        base = OSLog_base;
+        size = OSLog_size;
+    }
+    else if (type == 3) {
         base = Data_base;
         size = Data_size;
     }
     else {
-        base = OSLog_base;
-        size = OSLog_size;
+        base = CString_base;
+        size = CString_size;
     }
     
     str = Boyermoore_horspool_memmem(Kernel + base, size, (uint8_t *)string, strlen(string));
@@ -1072,6 +1084,23 @@ addr_t Find_trustcache(void) {
     if (!val) {
         // iOS 12
         ref = Find_strref("\"loadable trust cache buffer too small (%ld) for entries claimed (%d)\"", 1, 0, false);
+        if (!ref && PPLText_base) {
+            // A12
+            
+            ref = Find_strref("\"loadable trust cache buffer too small (%ld) for entries claimed (%d)\"", 1, 4, false);
+            if (!ref) {
+                return 0;
+            }
+            
+            ref -= KernDumpBase;
+            
+            val = Calc64(Kernel, ref-32*4, ref-24*4, 8);
+            if (!val) {
+                return 0;
+            }
+            
+            return val + KernDumpBase;
+        }
         if (!ref) {
             return 0;
         }
@@ -1081,10 +1110,42 @@ addr_t Find_trustcache(void) {
         if (!val) {
             return 0;
         }
-        return val + KernDumpBase + KASLR_Slide;
+        return val + KernDumpBase;
     }
     return val + KernDumpBase + KASLR_Slide;
 }
+
+addr_t Find_pmap_load_trust_cache() {
+    uint64_t ref;
+    
+    if (PPLText_Base) {
+        ref = Find_strref("\"loadable trust cache buffer too small (%ld) for entries claimed (%d)\"", 1, 4, false);
+    }
+    else {
+        ref = Find_strref("\"loadable trust cache buffer too small (%ld) for entries claimed (%d)\"", 1, 0, false);
+    }
+    
+    if (!ref) {
+        return 0;
+    }
+    
+    ref -= KernDumpBase;
+    
+    uint64_t addr;
+    if (PPLText_Base) {
+        addr = BOF64(Kernel, PPLText_Base, ref);
+    }
+    else {
+        addr = BOF64(Kernel, XNUCore_Base, ref);
+    }
+    
+    if (!addr) {
+        return 0;
+    }
+    
+    return addr + KernDumpBase + KASLR_Slide;
+}
+
 
 addr_t Find_amficache() {
     uint64_t cbz, call, func, val;
