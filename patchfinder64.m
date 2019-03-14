@@ -1177,7 +1177,7 @@ addr_t Find_pmap_load_trust_cache_ppl() {
         return 0;
     }
     
-    return our_thing + KernDumpBase + KASLR_Slide;
+    return our_thing + KASLR_Slide;
 }
 
 addr_t Find_amficache() {
