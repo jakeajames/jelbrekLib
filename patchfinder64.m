@@ -1137,9 +1137,12 @@ addr_t Find_trustcache(void) {
 }
 
 addr_t Find_pmap_load_trust_cache_ppl() {
-    uint64_t ref = Find_strref("%s: trust cache already loaded, ignoring", 1, 0, false);
+    uint64_t ref = Find_strref("%s: trust cache already loaded, ignoring", 2, 0, false);
     if (!ref) {
-        return 0;
+        ref = Find_strref("%s: trust cache already loaded, ignoring", 1, 0, false);
+        if (!ref) {
+            return 0;
+        }
     }
     ref -= KernDumpBase;
     
@@ -1162,7 +1165,6 @@ addr_t Find_pmap_load_trust_cache_ppl() {
     
     return func + KernDumpBase + KASLR_Slide;
 }
-
 addr_t Find_amficache() {
     uint64_t cbz, call, func, val;
     uint64_t ref = Find_strref("amfi_prevent_old_entitled_platform_binaries", 1, 1, false);
