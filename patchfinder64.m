@@ -479,8 +479,8 @@ static addr_t Data_base = 0;
 static addr_t Data_size = 0;
 static addr_t Data_const_base = 0;
 static addr_t Data_const_size = 0;
-static addr_t PPLText_base = 0;
-static addr_t PPLText_size = 0;
+addr_t PPLText_base = 0;
+addr_t PPLText_size = 0;
 
 static addr_t KernDumpBase = -1;
 static addr_t Kernel_entry = 0;
