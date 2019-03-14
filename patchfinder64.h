@@ -10,6 +10,7 @@ uint64_t Find_bcopy(void);
 uint64_t Find_rootvnode(void);
 uint64_t Find_trustcache(void);
 uint64_t Find_amficache(void);
+uint64_t Find_pmap_load_trust_cache_ppl(void);
 uint64_t Find_OSBoolean_True(void);
 uint64_t Find_OSBoolean_False(void);
 uint64_t Find_zone_map_ref(void);
