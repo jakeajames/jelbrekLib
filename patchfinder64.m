@@ -1137,47 +1137,30 @@ addr_t Find_trustcache(void) {
 }
 
 addr_t Find_pmap_load_trust_cache_ppl() {
-    uint32_t bytes[] = {
-        0xd538d08a, // mrs x10, tpidr_el1
-        0xb944714c, // ldr w12, [x10, #0x470]
-        0x1100058c, // add w12, [xw12, #1]
-        0xb904714c, // str w12, [x10, #0x470]
-    };
-    
-    uint64_t weird_function = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)((uint64_t)Kernel + XNUCore_Base), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
-    if (!weird_function) {
-        return 0;
-    }
-    weird_function -= (uint64_t)Kernel;
-    
-    uint64_t begin = BOF64(Kernel, XNUCore_Base, weird_function);
-    if (!begin) {
-        return 0;
-    }
-    
-    int n = 1;
-    uint64_t ref;
-    uint64_t val;
-    
-    do {
-        ref = Find_reference(begin + KernDumpBase, n, 0);
-        ref -= KernDumpBase;
-        val = Calc64(Kernel, ref - 4, ref, 15);
-        n++;
-    }
-    while (val != 0x25);
-    
+    uint64_t ref = Find_strref("%s: trust cache already loaded, ignoring", 1, 0, false);
     if (!ref) {
         return 0;
     }
+    ref -= KernDumpBase;
     
-    uint64_t func = ref - 4;
-    uint64_t our_thing = Find_reference(func + KernDumpBase, 1, 0);
-    if (!our_thing) {
+    uint64_t func = Step64_back(Kernel, ref, 200, INSN_CALL);
+    if (!func) {
         return 0;
     }
     
-    return our_thing + KASLR_Slide;
+    func -= 4;
+    
+    func = Step64_back(Kernel, func, 200, INSN_CALL);
+    if (!func) {
+        return 0;
+    }
+    
+    func = Follow_call64(Kernel, func);
+    if (!func) {
+        return 0;
+    }
+    
+    return func + KernDumpBase + KASLR_Slide;
 }
 
 addr_t Find_amficache() {
