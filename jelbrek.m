@@ -296,12 +296,7 @@ int trustbin(const char *path) {
         }
     }
     
-    bool isA12 = false;
     uint64_t trust_chain = Find_trustcache();
-    if (!trust_chain) {
-        trust_chain = 0xFFFFFFF008F702C8 + KASLR_Slide;
-        isA12 = true;
-    }
     
     printf("[*] trust_chain at 0x%llx\n", trust_chain);
     
@@ -335,8 +330,10 @@ int trustbin(const char *path) {
     KernelWrite(kernel_trust, &fake_chain, sizeof(fake_chain));
     KernelWrite(kernel_trust + sizeof(fake_chain), allhash, cnt * sizeof(hash_t));
     
-    if (isA12) {
-        Kernel_Execute(0xFFFFFFF007B80504 + KASLR_Slide, kernel_trust, length, 0, 0, 0, 0, 0);
+    extern uint64_t PPLText_base;
+    
+    if (PPLText_base) {
+        Kernel_Execute(Find_pmap_load_trust_cache_ppl(), kernel_trust, length, 0, 0, 0, 0, 0);
     }
     else {
         KernelWrite_64bits(trust_chain, kernel_trust);
