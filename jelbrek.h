@@ -31,9 +31,13 @@
 //---Obj-c stuff---//
 #import <Foundation/Foundation.h>
 
+
+typedef int (*kexecFunc)(uint64_t function, size_t argument_count, ...);
+
 extern uint32_t KASLR_Slide;
 extern uint64_t KernelBase;
 extern mach_port_t TFP0;
+extern kexecFunc kernel_exec;
 
 /*
  Purpose: Initialize jelbrekLib (first thing you have to call)
@@ -58,7 +62,7 @@ void term_jelbrek(void);
  Purpose:
     Add a macho binary on the AMFI trustcache
  Parameters:
-    A path to single macho or a directory for recursive patching
+    A path to single macho or a directory for recursive patching. Binaries must be signed with SHA256
  Return values:
     -1: path doesn't exist
     -2: Couldn't find valid macho in directory
@@ -70,6 +74,18 @@ void term_jelbrek(void);
      7: file mmap() failed
 */
 int trustbin(const char *path);
+
+/*
+ Purpose:
+    Bypass all codesign checks for a macho. Binary can be signed with SHA1 or SHA256
+ Parameters:
+    A path to a macho
+ Return values:
+    -1: error
+    0: success
+ */
+
+int bypassCodeSign(const char *macho);
 
 /*
  Purpose:

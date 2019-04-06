@@ -1,4 +1,5 @@
 #import "jelbrek.h"
+#import "amfi_utils.h"
 
 uint32_t KASLR_Slide;
 uint64_t KernelBase;
@@ -142,7 +143,8 @@ int init_with_kbase(mach_port_t tfpzero, uint64_t kernelBase, kexecFunc kexec) {
         }
         printf("[+] Initialized patchfinder\n");
         
-        if (!kexec) init_Kernel_Execute(); //kernel execution
+        kernel_exec = kexec;
+        if (!kernel_exec) init_Kernel_Execute(); //kernel execution
         
         return 0;
     }
@@ -302,9 +304,11 @@ int trustbin(const char *path) {
     
     struct trust_chain fake_chain;
     fake_chain.next = KernelRead_64bits(trust_chain);
-    *(uint64_t *)&fake_chain.uuid[0] = 0xabadbabeabadbabe;
-    *(uint64_t *)&fake_chain.uuid[8] = 0xabadbabeabadbabe;
+    ((uint64_t*)fake_chain.uuid)[0] = 0xbadbabeabadbabe;
+    ((uint64_t*)fake_chain.uuid)[1] = 0xbadbabeabadbabe;
     
+    //arc4random_buf(fake_chain.uuid, 16);
+
     int cnt = 0;
     uint8_t hash[CC_SHA256_DIGEST_LENGTH];
     hash_t *allhash = malloc(sizeof(hash_t) * [paths count]);
@@ -330,17 +334,391 @@ int trustbin(const char *path) {
     KernelWrite(kernel_trust, &fake_chain, sizeof(fake_chain));
     KernelWrite(kernel_trust + sizeof(fake_chain), allhash, cnt * sizeof(hash_t));
     
-    extern uint64_t PPLText_base;
+    extern uint64_t PPLText_size;
     
-    if (PPLText_base) {
+#if __arm64e__
         Kernel_Execute(Find_pmap_load_trust_cache_ppl(), kernel_trust, length, 0, 0, 0, 0, 0);
-    }
-    else {
+#else
         KernelWrite_64bits(trust_chain, kernel_trust);
-    }
+#endif
     
     free(allhash);
     
+    return 0;
+}
+
+static const char *csblob_parse_teamid(struct cs_blob *csblob) {
+    const CS_CodeDirectory *cd;
+    
+    cd = csblob->csb_cd;
+    
+    if (ntohl(KernelRead_32bits((uint64_t)cd + offsetof(CS_CodeDirectory, version))) < CS_SUPPORTSTEAMID) return 0;
+    if (KernelRead_32bits((uint64_t)cd + offsetof(CS_CodeDirectory, teamOffset)) == 0) return 0;
+    
+    const char *name = ((const char *)cd) + ntohl(KernelRead_32bits((uint64_t)cd + offsetof(CS_CodeDirectory, teamOffset)));
+    return name;
+}
+
+
+int bypassCodeSign(const char *macho) {
+    uint64_t vnode = 0, addr = 0;
+    size_t blob_size = 0;
+    FILE *file = NULL;
+    CS_GenericBlob *buf_blob = NULL;
+    struct cs_blob *blob = NULL;
+    CS_CodeDirectory *rcd = NULL;
+    CS_GenericBlob *rentitlements = NULL;
+    
+    // open
+    if ((file = fopen(macho, "rb")) == NULL) {
+        printf("[-] Failed to open file '%s'\n", macho);
+        goto error;
+    }
+    
+    // get vnode
+    vnode = getVnodeAtPath(macho);
+    if (!vnode) {
+        printf("[-] Can't get vnode for file '%s'\n", macho);
+        goto error;
+    }
+    
+    // get ubc_info
+    uint64_t ubc_info = KernelRead_64bits(vnode + off_v_ubcinfo);
+    if (!vnode) {
+        printf("[-] Can't get ubc_info for file '%s'\n", macho);
+        goto error;
+    }
+    
+    // check if a cs_blob is already loaded, in which case there would be no need to do this
+    uint64_t cs_blob = KernelRead_64bits(ubc_info + off_ubcinfo_csblobs);
+    if (cs_blob) {
+        printf("[*] File '%s' already has a blob! Updating gen_count\n", macho);
+        KernelWrite_32bits(ubc_info + 44, KernelRead_32bits(Find_cs_gen_count()));
+        goto success;
+    }
+    
+    //------ magic start here ------//
+    
+    // see load_code_signature()
+    
+    int64_t machOffset;
+    uint64_t lc_cmd = getCodeSignatureLC(file, &machOffset);
+    if (!lc_cmd || machOffset < 0) {
+        printf("[-] Can't find LC_CODE_SIGNATURE or binary is not arm64!\n");
+        goto error;
+    }
+    
+    struct linkedit_data_command *lcp = load_bytes(file, lc_cmd, sizeof(struct linkedit_data_command));
+    lcp->dataoff += machOffset;
+    
+    blob_size = lcp->datasize;
+    addr = Kernel_alloc(blob_size);
+    if (!addr) {
+        printf("[-] Failed to allocate\n");
+        goto error;
+    }
+    
+    buf_blob = load_bytes(file, lcp->dataoff, lcp->datasize);
+    if (!buf_blob) {
+        printf("[-] Can't load blob\n");
+        goto error;
+    }
+    
+    if (KernelWrite(addr, buf_blob, lcp->datasize) != lcp->datasize) {
+        printf("[-] Can't write!\n");
+        goto error;
+    }
+    
+    // ubc_cs_blob_add:
+    // cs_blob_create_validated:
+    
+    blob = malloc(sizeof(struct cs_blob));
+    blob->csb_mem_size = lcp->datasize;
+    blob->csb_mem_offset = 0;
+    blob->csb_mem_kaddr = addr;
+    blob->csb_flags = 0;
+    blob->csb_signer_type = CS_SIGNER_TYPE_UNKNOWN;
+    blob->csb_platform_binary = 0;
+    blob->csb_platform_path = 0;
+    blob->csb_teamid = NULL;
+    blob->csb_entitlements_blob = NULL;
+    blob->csb_entitlements = NULL;
+    blob->csb_reconstituted = false;
+    
+    size_t length = lcp->datasize;
+    
+    if (cs_validate_csblob((const uint8_t *)addr, length, &rcd, &rentitlements)) {
+        printf("[-] Invalid blob\n");
+        goto error;
+    }
+    
+    const unsigned char *md_base;
+    uint8_t hash[CS_HASH_MAX_SIZE];
+    int md_size;
+    
+    uint64_t cd = (uint64_t)rcd;
+    rcd = malloc(sizeof(CS_CodeDirectory));
+    KernelRead(cd, rcd, sizeof(CS_CodeDirectory));
+    
+    uint64_t entitlements = 0;
+    
+    if (rentitlements) {
+        entitlements = (uint64_t)rentitlements;
+        rentitlements = malloc(sizeof(CS_GenericBlob));
+        KernelRead(entitlements, rentitlements, sizeof(CS_GenericBlob));
+    }
+    
+    blob->csb_cd = (const CS_CodeDirectory *)cd;
+    blob->csb_entitlements_blob = (const CS_GenericBlob *)entitlements;
+    blob->csb_hashtype = cs_find_md(rcd->hashType);
+    
+    if (blob->csb_hashtype == NULL || KernelRead_64bits((uint64_t)blob->csb_hashtype + offsetof(struct cs_hash, cs_digest_size)) > sizeof(hash)) {
+        printf("[-] UNSUPPORTED TYPE. AM I SUPPOSED TO PANIC? Hmm...\n");
+        sleep(2);
+        printf("nah...");
+        goto error;
+    }
+    
+    blob->csb_hash_pageshift = rcd->pageSize;
+    blob->csb_hash_pagesize = (1U << rcd->pageSize);
+    blob->csb_hash_pagemask = blob->csb_hash_pagesize - 1;
+    blob->csb_hash_firstlevel_pagesize = 0;
+    blob->csb_flags = (ntohl(rcd->flags) & CS_ALLOWED_MACHO) | CS_VALID;
+    blob->csb_end_offset = (((vm_offset_t)ntohl(rcd->codeLimit) + blob->csb_hash_pagemask) & ~((vm_offset_t)blob->csb_hash_pagemask));
+    if((ntohl(rcd->version) >= CS_SUPPORTSSCATTER) && (ntohl(rcd->scatterOffset))) {
+        const SC_Scatter *scatter = (const SC_Scatter*)
+        ((const char*)rcd + ntohl(rcd->scatterOffset));
+        blob->csb_start_offset = ((off_t)ntohl(scatter->base)) * blob->csb_hash_pagesize;
+    } else {
+        blob->csb_start_offset = 0;
+    }
+    
+    md_base = (const unsigned char *)cd;
+    md_size = ntohl(rcd->length);
+    
+    // BAAAAAH
+    /*blob->csb_hashtype->cs_init(&mdctx);
+     blob->csb_hashtype->cs_update(&mdctx, md_base, md_size);
+     blob->csb_hashtype->cs_final(hash, &mdctx);*/
+    
+    getSHA256inplace((uint8_t *)getCodeDirectory(macho), hash); // hash is not checked. it'll work with SHA1 as well
+    memcpy(blob->csb_cdhash, hash, CS_CDHASH_LEN);
+    
+    // end cs_blob_create_validated
+    
+    blob->csb_cpu_type = 0x0100000c; // assume arm64
+    blob->csb_base_offset = machOffset;
+    
+    // vnode_check_signature:
+    blob->csb_signer_type = 0;
+    blob->csb_flags = 0x24000005;
+    blob->csb_platform_binary = 1;
+    
+    // CoreTrustCheckThisBinaryPls():
+    // NAAAAH HAHA BYE BYE
+    // amfidCheckPls(): screw you too
+    
+    // end fake vnode_check_signature()
+    
+    // CoreTrust & amfid both returned success as you can see ^ \ssssss
+    
+    vm_address_t new_mem_kaddr = 0;
+    vm_size_t new_mem_size = 0;
+    
+    CS_CodeDirectory *new_cd = NULL;
+    CS_GenericBlob const *new_entitlements = NULL;
+    
+    // ubc_cs_reconstitute_code_signature:
+    // Apple come on, why are these funcs not separate in the kernelcache but separate on XNU sources. it would have saved me so much time...
+    
+    vm_offset_t new_blob_addr;
+    vm_size_t new_blob_size;
+    vm_size_t new_cdsize;
+    
+    const CS_CodeDirectory *old_cd = blob->csb_cd;
+    new_cdsize = htonl(KernelRead_32bits((uint64_t)old_cd + offsetof(CS_CodeDirectory, length)));
+    
+    new_blob_size = sizeof(CS_SuperBlob);
+    new_blob_size += sizeof(CS_BlobIndex);
+    new_blob_size += new_cdsize;
+    
+    if (blob->csb_entitlements_blob) {
+        new_blob_size += sizeof(CS_BlobIndex);
+        new_blob_size += ntohl(KernelRead_32bits((uint64_t)blob->csb_entitlements_blob + offsetof(CS_GenericBlob, length)));
+    }
+    
+    new_blob_addr = ubc_cs_blob_allocate(new_blob_size);
+    if (!new_blob_addr) {
+        printf("[-] Can't alloc\n");
+        goto error;
+    }
+    
+    CS_SuperBlob *new_superblob = (CS_SuperBlob *)new_blob_addr;
+    KernelWrite_32bits((uint64_t)new_superblob + offsetof(CS_SuperBlob, magic), htonl(CSMAGIC_EMBEDDED_SIGNATURE));
+    KernelWrite_32bits((uint64_t)new_superblob + offsetof(CS_SuperBlob, length), htonl((uint32_t)new_blob_size));
+    
+    if (blob->csb_entitlements_blob) {
+        vm_size_t ent_offset, cd_offset;
+        
+        cd_offset = sizeof(CS_SuperBlob) + 2 * sizeof(CS_BlobIndex);
+        ent_offset = cd_offset +  new_cdsize;
+        
+        KernelWrite_32bits((uint64_t)new_superblob + offsetof(CS_SuperBlob, count), htonl(2));
+        KernelWrite_32bits((uint64_t)new_superblob + offsetof(CS_SuperBlob, index[0].type), htonl(CSSLOT_CODEDIRECTORY));
+        KernelWrite_32bits((uint64_t)new_superblob + offsetof(CS_SuperBlob, index[0].offset), htonl((uint32_t)cd_offset));
+        KernelWrite_32bits((uint64_t)new_superblob + offsetof(CS_SuperBlob, index[1].type), htonl(CSSLOT_ENTITLEMENTS));
+        KernelWrite_32bits((uint64_t)new_superblob + offsetof(CS_SuperBlob, index[1].offset), htonl((uint32_t)ent_offset));
+        
+        void *buf = malloc(ntohl(KernelRead_32bits((uint64_t)blob->csb_entitlements_blob + offsetof(CS_GenericBlob, length))));
+        KernelRead((uint64_t)blob->csb_entitlements_blob, buf, ntohl(KernelRead_32bits((uint64_t)blob->csb_entitlements_blob + offsetof(CS_GenericBlob, length))));
+        KernelWrite((uint64_t)(new_blob_addr + ent_offset), buf, ntohl(KernelRead_32bits((uint64_t)blob->csb_entitlements_blob + offsetof(CS_GenericBlob, length))));
+        free(buf);
+        
+        new_cd = (CS_CodeDirectory *)(new_blob_addr + cd_offset);
+    } else {
+        new_cd = (CS_CodeDirectory *)new_blob_addr;
+    }
+    
+    void *buf = malloc(new_cdsize);
+    KernelRead((uint64_t)old_cd, buf, new_cdsize);
+    KernelWrite((uint64_t)new_cd, buf, new_cdsize);
+    free(buf);
+    
+    vm_size_t len = new_blob_size;
+    
+    CS_CodeDirectory *_cd = NULL;
+    CS_GenericBlob *_entitlements = NULL;
+    
+    if (cs_validate_csblob((const uint8_t *)new_blob_addr, len, &_cd, &_entitlements)) {
+        printf("[-] Invalid blob\n");
+        Kernel_Execute(Find_kfree(), new_blob_addr, new_blob_size, 0, 0, 0, 0, 0);
+        goto error;
+    }
+    
+    new_entitlements = _entitlements;
+    new_mem_size = new_blob_size;
+    new_mem_kaddr = new_blob_addr;
+    
+    // end ubc_cs_reconstitute_code_signature
+    
+    Kernel_free(blob->csb_mem_kaddr, blob->csb_mem_size);
+    addr = 0;
+    
+    blob->csb_mem_kaddr = new_mem_kaddr;
+    blob->csb_mem_size = new_mem_size;
+    blob->csb_cd = new_cd;
+    
+    if (!new_entitlements) {
+        const char *newEntitlements =   "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+                                        "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">"
+                                        "<plist version=\"1.0\">"
+                                            "<dict>"
+                                                "<key>platform-application</key>"                          // we're apple made :)
+                                                "<true/>"
+                                                "<key>com.apple.private.security.no-container</key>"       // no container
+                                                "<true/>"
+                                              //"<key>com.apple.private.security.container-required</key>" // containermanagerd no crazy
+                                              //"<false/>"
+                                                "<key>get-task-allow</key>"                                // allow us to task_for_pid
+                                                "<true/>"
+                                                "<key>com.apple.private.skip-library-validation</key>"     // allow invalid libs
+                                                "<true/>"
+                                            "</dict>"
+                                        "</plist>";
+        
+        CS_GenericBlob *newBlob = malloc(sizeof(CS_GenericBlob) + strlen(newEntitlements) + 1);
+        if (!newBlob) {
+            printf("[-] Can't alloc new entitlements\n");
+            goto error;
+        }
+        
+        newBlob->magic = ntohl(CSMAGIC_EMBEDDED_ENTITLEMENTS);
+        newBlob->length = ntohl(strlen(newEntitlements) + 1);
+        memcpy(newBlob->data, newEntitlements, strlen(newEntitlements) + 1);
+        new_entitlements = (CS_GenericBlob *)ubc_cs_blob_allocate(sizeof(CS_GenericBlob) + strlen(newEntitlements) + 1);
+        
+        if (!new_entitlements) {
+            printf("[-] Can't alloc new entitlements on kernel\n");
+            free(blob);
+            goto error;
+        }
+        
+        KernelWrite((uint64_t)new_entitlements, newBlob, sizeof(CS_GenericBlob) + strlen(newEntitlements) + 1);
+        free(newBlob);
+    }
+    
+    blob->csb_entitlements_blob = new_entitlements;
+    
+    uint64_t ents = Kernel_Execute(Find_osunserializexml(), (uint64_t)new_entitlements + offsetof(CS_GenericBlob, data), 0, 0, 0, 0, 0, 0);
+    if (ents) {
+        ents = ZmFixAddr(ents);
+        blob->csb_entitlements = (void *)ents;
+        
+        uint64_t OSBoolTrue = Find_OSBoolean_True();
+        OSDictionary_SetItem(ents, "platform-application", OSBoolTrue);
+        OSDictionary_SetItem(ents, "com.apple.private.security.no-container", OSBoolTrue);
+        OSDictionary_SetItem(ents, "get-task-allow", OSBoolTrue);
+        OSDictionary_SetItem(ents, "com.apple.private.skip-library-validation", OSBoolTrue);
+    }
+    else {
+        printf("[?] Invalid entitlement blob??\n");
+        goto error;
+    }
+    blob->csb_reconstituted = true;
+    blob->csb_teamid = csblob_parse_teamid(blob);
+    
+    off_t blob_start_offset = blob->csb_base_offset + blob->csb_start_offset;
+    off_t blob_end_offset = blob->csb_base_offset + blob->csb_end_offset;
+    
+    if (blob_start_offset >= blob_end_offset || blob_start_offset < 0 || blob_end_offset <= 0) {
+        printf("[-] Invalid blob\n");
+        goto error;
+    }
+    
+    // memory_object_signed()
+    uint64_t ui_control = KernelRead_64bits(ubc_info + 8);
+    uint64_t moc_object = KernelRead_64bits(ui_control + 8);
+    KernelWrite_32bits(moc_object + 168, (KernelRead_32bits(moc_object + 168) & 0xFFFFFEFF) | (1 << 8));
+    KernelWrite_32bits(ubc_info + 44, KernelRead_32bits(Find_cs_gen_count()));
+    blob->csb_next = 0;
+    
+    // write it!
+    uint64_t kblob = ubc_cs_blob_allocate(sizeof(struct cs_blob));
+    KernelWrite(kblob, blob, sizeof(struct cs_blob));
+    KernelWrite_64bits(ubc_info + off_ubcinfo_csblobs, kblob);
+    
+    if (strstr(macho, ".dylib")) {
+        uint32_t v_flags = KernelRead_32bits(vnode + off_v_flags);
+        KernelWrite_32bits(vnode + off_v_flags, v_flags | 0x200); // VSHARED_DYLD
+    }
+    
+    printf("[?] Am I still alive?\n");
+    goto success;
+    
+    //------ magic end here ------//
+    
+error:;
+    if (file) fclose(file);
+    if (vnode) vnode_put(vnode);
+    if (addr) Kernel_Execute(Find_kfree(), addr, blob_size, 0, 0, 0, 0, 0);
+    if (blob) free(blob);
+    if (buf_blob) free(buf_blob);
+    if (rcd) free(rcd);
+    if (rentitlements) free(rentitlements);
+    
+    printf("[-] Blob creation failed!\n");
+    return -1;
+    
+success:;
+    if (file) fclose(file);
+    if (vnode) vnode_put(vnode);
+    if (addr) Kernel_Execute(Find_kfree(), addr, blob_size, 0, 0, 0, 0, 0);
+    if (blob) free(blob);
+    if (buf_blob) free(buf_blob);
+    if (rcd) free(rcd);
+    if (rentitlements) free(rentitlements);
+    
+    printf("[+] Seems like we succeeded!\n");
     return 0;
 }
 
@@ -689,7 +1067,7 @@ int launchSuspended(char *binary, char *arg1, char *arg2, char *arg3, char *arg4
     
     posix_spawnattr_t attr;
     posix_spawnattr_init(&attr);
-    posix_spawnattr_setflags(&attr, POSIX_SPAWN_START_SUSPENDED); //this flag will make the created process stay frozen until we send the CONT signal. This so we can platformize it before it launches.
+    posix_spawnattr_setflags(&attr, POSIX_SPAWN_START_SUSPENDED); //this flag will make the created process stay frozen until we send the CONT signal.
     
     int rv = posix_spawn(&pd, binary, NULL, &attr, (char **)&args, env);
     
@@ -704,10 +1082,12 @@ int launch(char *binary, char *arg1, char *arg2, char *arg3, char *arg4, char *a
     int rv = posix_spawn(&pd, binary, NULL, NULL, (char **)&args, env);
     if (rv) return rv;
     
-    int a = 0;
-    waitpid(pd, &a, 0);
+    return 0;
     
-    return WEXITSTATUS(a);
+    //int a = 0;
+    //waitpid(pd, &a, 0);
+    
+    //return WEXITSTATUS(a);
 }
 
 BOOL remount1126() {

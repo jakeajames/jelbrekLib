@@ -16,7 +16,7 @@ Library with commonly used patches in open-source jailbreaks. Call this a (light
 # Issues
 - AMFID patch won't resist after app enters background. Fix would be using a daemon (like amfidebilitate) or injecting a dylib (iOS 11)
 
-# iOS 12 status
+# iOS 12 satus
 - rootFS remount is broken. There is hardening on snapshot_rename() which *can* and *has* been (privately) bypassed, but it for sure isn't as bad as last year with iOS 11.3.1, where they made **major** changes. The only thing we need is figuring out how they check if the snapshot is the rootfs and not something in /var for example where snapshot_rename works fine.
 - kexecute() is also probably broken on A12. Use bazad's PAC bypass which offers the same thing, so this isn't an issue (fr now)
 - getting root, unsandboxing, NVRAM lock/unlock, setHSP4(), trustbin(), entitlePid + task_for_pid() are all working fine. The rest that is not on top of my mind should also work fine.

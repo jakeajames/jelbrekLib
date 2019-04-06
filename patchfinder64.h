@@ -21,3 +21,23 @@ uint64_t Find_bootargs(void);
 uint64_t Find_vfs_context_current(void);
 uint64_t Find_vnode_lookup(void);
 uint64_t Find_vnode_put(void);
+uint64_t Find_cs_gen_count(void);
+uint64_t Find_cs_validate_csblob(void);
+uint64_t Find_kalloc_canblock(void);
+uint64_t Find_cs_blob_allocate_site(void);
+uint64_t Find_kfree(void);
+uint64_t Find_cs_find_md(void);
+
+// PAC
+uint64_t Find_l2tp_domain_module_start(void);
+uint64_t Find_l2tp_domain_module_stop(void);
+uint64_t Find_l2tp_domain_inited(void);
+uint64_t Find_sysctl_net_ppp_l2tp(void);
+uint64_t Find_sysctl_unregister_oid(void);
+uint64_t Find_mov_x0_x4__br_x5(void);
+uint64_t Find_mov_x9_x0__br_x1(void);
+uint64_t Find_mov_x10_x3__br_x6(void);
+uint64_t Find_kernel_forge_pacia_gadget(void);
+uint64_t Find_kernel_forge_pacda_gadget(void);
+uint64_t Find_IOUserClient_vtable(void);
+uint64_t Find_IORegistryEntry__getRegistryEntryID(void);

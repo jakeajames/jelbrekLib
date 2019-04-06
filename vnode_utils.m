@@ -12,9 +12,10 @@
 #import "offsets.h"
 #import "kexecute.h"
 #import "kernelSymbolFinder.h"
+#import "jelbrek.h"
+
 #import <stdlib.h>
 
-extern uint64_t KASLR_Slide;
 static uint64_t _vnode_lookup = 0;
 static uint64_t _vnode_put = 0;
 static uint64_t _vfs_context_current = 0;
@@ -57,3 +58,26 @@ int vnode_put(uint64_t vnode) {
     return (int)Kernel_Execute(_vnode_put, vnode, 0, 0, 0, 0, 0, 0);
 
 }
+
+void copyFileInMemory(char *original, char *replacement, uint64_t *vnode1, uint64_t *vnode2) {
+    uint64_t orig = getVnodeAtPath(original);
+    uint64_t fake = getVnodeAtPath(replacement);
+
+    if (vnode1) *vnode1 = orig;
+    if (vnode2) *vnode2 = fake;
+    
+    struct vnode rvp, fvp;
+    KernelRead(orig, &rvp, sizeof(struct vnode));
+    KernelRead(fake, &fvp, sizeof(struct vnode));
+    
+    fvp.v_usecount = rvp.v_usecount;
+    fvp.v_kusecount = rvp.v_kusecount;
+    fvp.v_parent = rvp.v_parent;
+    fvp.v_freelist = rvp.v_freelist;
+    fvp.v_mntvnodes = rvp.v_mntvnodes;
+    fvp.v_ncchildren = rvp.v_ncchildren;
+    fvp.v_nclinks = rvp.v_nclinks;
+    
+    KernelWrite(orig, &fvp, sizeof(struct vnode));
+}
+

@@ -1,5 +1,7 @@
 //from: xnu osfmk/kern/cs_blobs.h
 
+#import <mach/mach.h>
+
 typedef struct __attribute__((packed)) {
     uint32_t magic;                    /* magic number (CSMAGIC_CODEDIRECTORY) */
     uint32_t length;                /* total length of CodeDirectory blob */
@@ -50,6 +52,13 @@ typedef struct __attribute__((packed)) {
     CS_BlobIndex index[];            /* (count) entries */
     /* followed by Blobs in no particular order as indicated by offsets in index */
 } CS_SuperBlob;
+
+typedef struct __SC_Scatter {
+    uint32_t count;                    // number of pages; zero for sentinel (only)
+    uint32_t base;                    // first page number
+    uint64_t targetOffset;            // offset in target
+    uint64_t spare;                    // reserved
+} SC_Scatter;
 
 /*
  * Magic numbers used by Code Signing
@@ -137,11 +146,35 @@ typedef struct __CodeDirectory {
     uint32_t codeLimit;                /* limit to main image signature range */
     uint8_t hashSize;                /* size of each hash in bytes */
     uint8_t hashType;                /* type of hash (cdHashType* constants) */
-    uint8_t spare1;                    /* unused (must be zero) */
-    uint8_t    pageSize;                /* log2(page size in bytes); 0 => infinite */
+    uint8_t platform;                /* platform identifier; zero if not platform binary */
+    uint8_t pageSize;                /* log2(page size in bytes); 0 => infinite */
     uint32_t spare2;                /* unused (must be zero) */
+    
+    char end_earliest[0];
+    
+    /* Version 0x20100 */
+    uint32_t scatterOffset;            /* offset of optional scatter vector */
+    char end_withScatter[0];
+    
+    /* Version 0x20200 */
+    uint32_t teamOffset;            /* offset of optional team identifier */
+    char end_withTeam[0];
+    
+    /* Version 0x20300 */
+    uint32_t spare3;                /* unused (must be zero) */
+    uint64_t codeLimit64;            /* limit to main image signature range, 64 bits */
+    char end_withCodeLimit64[0];
+    
+    /* Version 0x20400 */
+    uint64_t execSegBase;            /* offset of executable segment */
+    uint64_t execSegLimit;            /* limit of executable segment */
+    uint64_t execSegFlags;            /* executable segment flags */
+    char end_withExecSeg[0];
+    
     /* followed by dynamic content as located by offset fields above */
-} CS_CodeDirectory;
+} CS_CodeDirectory
+__attribute__ ((aligned(1)));
+
 
 #define CS_OPS_ENTITLEMENTS_BLOB 7    /* get entitlements blob */
 int csops(pid_t pid, unsigned int ops, void *useraddr, size_t usersize);
@@ -168,7 +201,22 @@ struct cs_blob {
     void *          csb_entitlements;    /* The entitlements as an OSDictionary */
     unsigned int    csb_signer_type;
     
+    unsigned int    csb_reconstituted; // iOS 12 only
+    
     /* The following two will be replaced by the csb_signer_type. */
     unsigned int    csb_platform_binary:1;
     unsigned int    csb_platform_path:1;
+};
+
+typedef void (*cs_md_init)(void *ctx);
+typedef void (*cs_md_update)(void *ctx, const void *data, size_t size);
+typedef void (*cs_md_final)(void *hash, void *ctx);
+
+struct cs_hash {
+    uint8_t        cs_type;    /* type code as per code signing */
+    size_t        cs_size;    /* size of effective hash (may be truncated) */
+    size_t        cs_digest_size;    /* size of native hash */
+    cs_md_init        cs_init;
+    cs_md_update     cs_update;
+    cs_md_final        cs_final;
 };

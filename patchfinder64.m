@@ -1101,7 +1101,7 @@ addr_t Find_trustcache(void) {
     if (!val) {
         // iOS 12
         
-        if (PPLText_base) {
+        if (PPLText_size) {
             // A12
             
             ref = Find_strref("\"loadable trust cache buffer too small (%ld) for entries claimed (%d)\"", 1, 4, false);
@@ -1116,7 +1116,7 @@ addr_t Find_trustcache(void) {
                 return 0;
             }
             
-            return val + KernDumpBase;
+            return val + KernDumpBase + KASLR_Slide;
         }
         else {
             ref = Find_strref("\"loadable trust cache buffer too small (%ld) for entries claimed (%d)\"", 1, 0, false);
@@ -1131,18 +1131,15 @@ addr_t Find_trustcache(void) {
         if (!val) {
             return 0;
         }
-        return val + KernDumpBase;
+        return val + KernDumpBase + KASLR_Slide;
     }
     return val + KernDumpBase + KASLR_Slide;
 }
 
 addr_t Find_pmap_load_trust_cache_ppl() {
-    uint64_t ref = Find_strref("%s: trust cache already loaded, ignoring", 2, 0, false);
+    uint64_t ref = Find_strref("%s: trust cache already loaded, ignoring", 1, 0, false);
     if (!ref) {
-        ref = Find_strref("%s: trust cache already loaded, ignoring", 1, 0, false);
-        if (!ref) {
-            return 0;
-        }
+        return 0;
     }
     ref -= KernDumpBase;
     
@@ -1165,6 +1162,7 @@ addr_t Find_pmap_load_trust_cache_ppl() {
     
     return func + KernDumpBase + KASLR_Slide;
 }
+
 addr_t Find_amficache() {
     uint64_t cbz, call, func, val;
     uint64_t ref = Find_strref("amfi_prevent_old_entitled_platform_binaries", 1, 1, false);
@@ -1681,4 +1679,168 @@ addr_t Find_IORegistryEntry__getRegistryEntryID() {
     }
     
     return addr + KernDumpBase - (uint64_t)Kernel + KASLR_Slide;
+}
+
+addr_t Find_cs_gen_count() {
+    uint64_t ref = Find_strref("CS Platform Exec Logging: Executing platform signed binary '%s'", 1, 2, false);
+    if (!ref) {
+        return 0;
+    }
+    ref -= KernDumpBase;
+    
+    uint64_t addr = Step64(Kernel, ref, 200, INSN_ADRP);
+    if (!addr) {
+        return 0;
+    }
+    
+    addr = Calc64(Kernel, addr, addr + 12, 25);
+    if (!addr) {
+        return 0;
+    }
+    
+    return addr + KernDumpBase + KASLR_Slide;
+}
+
+
+addr_t Find_cs_validate_csblob() {
+    
+    uint32_t bytes[] = {
+        0x52818049, // mov w9, #0xC02
+        0x72bf5bc9, // movk w9, #0xfade, lsl#16
+        0x6b09011f  // cmp w8, w9
+    };
+    
+    uint64_t addr = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)((uint64_t)Kernel + XNUCore_Base), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
+    if (!addr) {
+        return 0;
+    }
+    
+    addr -= (uint64_t)Kernel;
+    addr = BOF64(Kernel, XNUCore_Base, addr);
+    if (!addr) {
+        return 0;
+    }
+    
+    return addr + KernDumpBase + KASLR_Slide;
+}
+
+addr_t Find_kalloc_canblock() {
+    
+    uint32_t bytes[] = {
+        0xaa0003f3, // mov x19, x0
+        0xf9400274, // ldr x20, [x19]
+        0xf11fbe9f  // cmp x20, #0x7ef
+    };
+    
+    uint64_t addr = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)((uint64_t)Kernel + XNUCore_Base), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
+    if (!addr) {
+        return 0;
+    }
+    addr -= (uint64_t)Kernel;
+    
+    addr = BOF64(Kernel, XNUCore_Base, addr);
+    if (!addr) {
+        return 0;
+    }
+    
+    return addr + KernDumpBase + KASLR_Slide;
+}
+
+addr_t Find_cs_blob_allocate_site() {
+    
+    uint32_t bytes[] = {
+        0xf9001ea8, // str x8, [x21, #0x38]
+        0xb9000ebf, // str wzr, [x21, #0xc]
+        0x3942a2a8, // ldrb 28, [x21, #0xa8]
+        0x121e1508, // and w8, w8, #0xfc
+    };
+    
+    uint64_t addr = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)((uint64_t)Kernel + XNUCore_Base), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
+    if (!addr) {
+        return 0;
+    }
+    addr -= (uint64_t)Kernel;
+    
+    addr = Step64_back(Kernel, addr, 200, INSN_ADRP);
+    if (!addr) {
+        return 0;
+    }
+    
+    addr = Calc64(Kernel, addr, addr + 8, 2);
+    if (!addr) {
+        return 0;
+    }
+    
+    return addr + KernDumpBase + KASLR_Slide;
+}
+
+addr_t Find_kfree() {
+    
+    uint32_t bytes[] = {
+        0xf9001ea8, // str x8, [x21, #0x38]
+        0xb9000ebf, // str wzr, [x21, #0xc]
+        0x3942a2a8, // ldrb 28, [x21, #0xa8]
+        0x121e1508, // and w8, w8, #0xfc
+    };
+    
+    uint64_t addr = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)((uint64_t)Kernel + XNUCore_Base), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
+    if (!addr) {
+        return 0;
+    }
+    addr -= (uint64_t)Kernel;
+    
+    addr = Step64(Kernel, addr, 200, INSN_CALL);
+    if (!addr) {
+        return 0;
+    }
+    
+    addr += 4;
+    
+    addr = Step64(Kernel, addr, 200, INSN_CALL);
+    if (!addr) {
+        return 0;
+    }
+    
+    addr = Follow_call64(Kernel, addr);
+    if (!addr) {
+        return 0;
+    }
+    
+    return addr + KernDumpBase + KASLR_Slide;
+}
+
+addr_t Find_cs_find_md() {
+    
+    uint32_t bytes[] = {
+        0xb9400008, // ldr w8, [x0]
+        0x529bdf49, // mov w9, #0xdefa
+        0x72a04189, // movk w9, #0x20c, lsl#16
+        0x6b09011f  // cmp w8, w9
+    };
+    
+    uint64_t addr = (uint64_t)Boyermoore_horspool_memmem((unsigned char *)((uint64_t)Kernel + XNUCore_Base), XNUCore_Size, (const unsigned char *)bytes, sizeof(bytes));
+    if (!addr) {
+        return 0;
+    }
+    
+    addr -= (uint64_t)Kernel;
+    
+    uint64_t adrp = Step64(Kernel, addr, 200, INSN_ADRP);
+    if (!adrp) {
+        return 0;
+    }
+    
+    adrp += 4;
+    
+    uint64_t adrp2 = Step64(Kernel, adrp, 200, INSN_ADRP);
+    if (adrp2) {
+        adrp = adrp2; // non-A12
+    }
+    
+    addr = Calc64(Kernel, adrp - 4, adrp + 8, 9);
+    if (!addr) {
+        return 0;
+    }
+    
+    return addr + KernDumpBase + KASLR_Slide;
 }

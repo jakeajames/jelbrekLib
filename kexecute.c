@@ -6,6 +6,10 @@
 #import "offsetof.h"
 #import <IOKit/IOKitLib.h>
 
+
+typedef int (*kexecFunc)(uint64_t function, size_t argument_count, ...);
+kexecFunc kernel_exec;
+
 mach_port_t PrepareUserClient(void) {
   kern_return_t err;
   mach_port_t UserClient;
@@ -36,9 +40,6 @@ static uint64_t IOSurfaceRootUserClient_Addr = 0;
 static uint64_t FakeVtable = 0;
 static uint64_t FakeClient = 0;
 const int fake_Kernel_alloc_size = 0x1000;
-
-typedef int (*kexecFunc)(uint64_t function, size_t argument_count, ...);
-static kexecFunc kernel_exec = 0;
 
 void init_Kernel_Execute(void) {
     UserClient = PrepareUserClient();

@@ -157,3 +157,110 @@ int strtail(const char *str, const char *tail)
     str += lstr - ltail;
     return memcmp(str, tail, ltail);
 }
+
+int cs_validate_csblob(const uint8_t *addr, size_t length, CS_CodeDirectory **rcd, CS_GenericBlob **rentitlements) {
+    uint64_t rcdptr = Kernel_alloc(8);
+    uint64_t entptr = Kernel_alloc(8);
+    
+    int ret = (int)Kernel_Execute(Find_cs_validate_csblob(), (uint64_t)addr, length, rcdptr, entptr, 0, 0, 0);
+    *rcd = (CS_CodeDirectory *)KernelRead_64bits(rcdptr);
+    *rentitlements = (CS_GenericBlob *)KernelRead_64bits(entptr);
+    
+    Kernel_free(rcdptr, 8);
+    Kernel_free(entptr, 8);
+    
+    return ret;
+}
+
+uint64_t ubc_cs_blob_allocate(vm_size_t size) {
+    uint64_t size_p = Kernel_alloc(sizeof(vm_size_t));
+    if (!size_p) return 0;
+    KernelWrite(size_p, &size, sizeof(vm_size_t));
+    uint64_t alloced = Kernel_Execute(Find_kalloc_canblock(), size_p, 1, Find_cs_blob_allocate_site(), 0, 0, 0, 0);
+    Kernel_free(size_p, sizeof(vm_size_t));
+    if (alloced) alloced = ZmFixAddr(alloced);
+    return alloced;
+}
+
+const struct cs_hash *cs_find_md(uint8_t type) {
+    return (struct cs_hash *)KernelRead_64bits(Find_cs_find_md() + ((type - 1) * 8));
+}
+
+uint64_t getCodeSignatureLC(FILE *file, int64_t *machOff) {
+    size_t offset = 0;
+    struct load_command *cmd = NULL;
+    
+    // Init at this
+    *machOff = -1;
+    
+    uint32_t *magic = load_bytes(file, offset, sizeof(uint32_t));
+    int ncmds = 0;
+    
+    // check magic
+    if (*magic != 0xFEEDFACF && *magic != 0xBEBAFECA) {
+        printf("[-] File is not an arm64 or FAT macho!\n");
+        free(magic);
+        return 0;
+    }
+    
+    // FAT
+    if(*magic == 0xBEBAFECA) {
+        
+        uint32_t arch_off = sizeof(struct fat_header);
+        struct fat_header *fat = (struct fat_header*)load_bytes(file, 0, sizeof(struct fat_header));
+        bool foundarm64 = false;
+        
+        int n = ntohl(fat->nfat_arch);
+        printf("[*] Binary is FAT with %d architectures\n", n);
+        
+        while (n-- > 0) {
+            struct fat_arch *arch = (struct fat_arch *)load_bytes(file, arch_off, sizeof(struct fat_arch));
+            
+            if (ntohl(arch->cputype) == 0x100000c) {
+                printf("[*] Found arm64\n");
+                offset = ntohl(arch->offset);
+                foundarm64 = true;
+                free(fat);
+                free(arch);
+                break;
+            }
+            free(arch);
+            arch_off += sizeof(struct fat_arch);
+        }
+        
+        if (!foundarm64) {
+            printf("[-] Binary does not have any arm64 slice\n");
+            free(fat);
+            free(magic);
+            return 0;
+        }
+    }
+    
+    free(magic);
+    
+    *machOff = offset;
+    
+    // get macho header
+    struct mach_header_64 *mh64 = load_bytes(file, offset, sizeof(struct mach_header_64));
+    ncmds = mh64->ncmds;
+    free(mh64);
+    
+    // next
+    offset += sizeof(struct mach_header_64);
+    
+    for (int i = 0; i < ncmds; i++) {
+        cmd = load_bytes(file, offset, sizeof(struct load_command));
+        
+        // this!
+        if (cmd->cmd == LC_CODE_SIGNATURE) {
+            free(cmd);
+            return offset;
+        }
+        
+        // next
+        offset += cmd->cmdsize;
+        free(cmd);
+    }
+    
+    return 0;
+}
