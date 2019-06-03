@@ -235,6 +235,17 @@ Step64_back(const uint8_t *buf, addr_t start, size_t length, uint32_t what, uint
 static addr_t
 BOF64(const uint8_t *buf, addr_t start, addr_t where)
 {
+    extern addr_t PPLText_size;
+    if (PPLText_size) {
+        for (; where >= start; where -= 4) {
+            uint32_t op = *(uint32_t *)(buf + where);
+            if (op == 0xD503237F) {
+                return where;
+            }
+        }
+        return 0;
+    }
+    
     for (; where >= start; where -= 4) {
         uint32_t op = *(uint32_t *)(buf + where);
         
@@ -1137,9 +1148,12 @@ addr_t Find_trustcache(void) {
 }
 
 addr_t Find_pmap_load_trust_cache_ppl() {
-    uint64_t ref = Find_strref("%s: trust cache already loaded, ignoring", 1, 0, false);
+    uint64_t ref = Find_strref("%s: trust cache already loaded, ignoring", 2, 0, false);
     if (!ref) {
-        return 0;
+        ref = Find_strref("%s: trust cache already loaded, ignoring", 1, 0, false);
+        if (!ref) {
+            return 0;
+        }
     }
     ref -= KernDumpBase;
     

@@ -304,10 +304,10 @@ int trustbin(const char *path) {
     
     struct trust_chain fake_chain;
     fake_chain.next = KernelRead_64bits(trust_chain);
-    ((uint64_t*)fake_chain.uuid)[0] = 0xbadbabeabadbabe;
-    ((uint64_t*)fake_chain.uuid)[1] = 0xbadbabeabadbabe;
+    //((uint64_t*)fake_chain.uuid)[0] = 0xbadbabeabadbabe;
+    //((uint64_t*)fake_chain.uuid)[1] = 0xbadbabeabadbabe;
     
-    //arc4random_buf(fake_chain.uuid, 16);
+    arc4random_buf(fake_chain.uuid, 16);
 
     int cnt = 0;
     uint8_t hash[CC_SHA256_DIGEST_LENGTH];
@@ -327,14 +327,12 @@ int trustbin(const char *path) {
     
     fake_chain.count = cnt;
     
-    size_t length = (sizeof(fake_chain) + cnt * sizeof(hash_t) + 0xFFFF) & ~0xFFFF;
+    size_t length = (sizeof(fake_chain) + cnt * sizeof(hash_t) + 0x3FFF) & ~0x3FFF;
     uint64_t kernel_trust = Kernel_alloc(length);
     printf("[*] allocated: 0x%zx => 0x%llx\n", length, kernel_trust);
     
     KernelWrite(kernel_trust, &fake_chain, sizeof(fake_chain));
     KernelWrite(kernel_trust + sizeof(fake_chain), allhash, cnt * sizeof(hash_t));
-    
-    extern uint64_t PPLText_size;
     
 #if __arm64e__
         Kernel_Execute(Find_pmap_load_trust_cache_ppl(), kernel_trust, length, 0, 0, 0, 0, 0);

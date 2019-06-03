@@ -25,6 +25,8 @@
 #import "kernel_utils.h"
 #import "inject_criticald.h"
 
+#if !__arm64e__
+
 kern_return_t mach_vm_allocate
 (
  vm_map_t target,
@@ -446,4 +448,4 @@ int inject_dylib(pid_t pid, char *loaded_dylib) {
     return 0;
 }
 
-
+#endif

@@ -17,6 +17,8 @@ static mach_port_name_t AMFID_ExceptionPort = MACH_PORT_NULL;
 uint64_t origAMFID_MISVSACI = 0;
 uint64_t amfid_base;
 
+#if !__arm64e__
+
 void* AMFIDExceptionHandler(void* arg) {
 
     uint32_t size = 0x1000;
@@ -241,3 +243,4 @@ uint64_t patchAMFID() {
     
     return origAMFID_MISVSACI;
 }
+#endif

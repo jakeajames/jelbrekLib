@@ -165,15 +165,14 @@ void _offsets_init() {
         off_itk_space = 0x300;
         off_csb_platform_binary = 0xa8;
         off_csb_platform_path = 0xac;
+#if __arm64e__
+        off_t_flags = 0x400;
+        _offsets[7] = 0x368;
+#else
         off_t_flags = 0x390;
-        
-        struct utsname u = { 0 };
-        uname(&u);
-        
-        if (strstr(u.machine, "iPhone11,") || strstr(u.machine, "iPad8,")) {
-            _offsets[7] = 0x368;
-        }
+#endif
     }
+    
     else if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"11.3")) {
         printf("[i] offsets selected for iOS 11.3 or above\n");
         _offsets = _kstruct_offsets_11_3;
