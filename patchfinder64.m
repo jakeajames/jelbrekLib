@@ -1459,34 +1459,6 @@ uint64_t Find_bootargs(void) {
     return val + KASLR_Slide;
 }
 
-addr_t Find_kernel_map() {
-    uint64_t ref = Find_strref("AMFI: Trying to load a trust cache while device is locked, only", 1, 1, false);
-    if (!ref) {
-        ref = Find_strref("AMFI: Trying to load a trust cache while device is locked, only", 1, 0, false);
-        if (!ref) {
-            return 0;
-        }
-    }
-    ref -= KernDumpBase;
-    
-    uint64_t func = BOF64(Kernel, (ref > XNUCore_Base) ? XNUCore_Base : Prelink_Base, ref);
-    if (!func) {
-        return 0;
-    }
-    
-    ref = Step64(Kernel, func, 60, INSN_ADRP);
-    if (!ref) {
-        return 0;
-    }
-    
-    uint64_t val = Calc64(Kernel, ref, ref + 8, 25);
-    if (!val) {
-        return 0;
-    }
-    
-    return (*(uint64_t *)(Kernel + val)) ? *(uint64_t *)(Kernel + val) : val + KernDumpBase + KASLR_Slide;
-}
-
 addr_t Find_l2tp_domain_module_start() {
     uint64_t string = (uint64_t)Boyermoore_horspool_memmem(Kernel + Data_base, Data_size, (const unsigned char *)"com.apple.driver.AppleSynopsysOTGDevice", strlen("com.apple.driver.AppleSynopsysOTGDevice")) - (uint64_t)Kernel;
     if (!string) {
@@ -1857,4 +1829,51 @@ addr_t Find_cs_find_md() {
     }
     
     return addr + KernDumpBase + KASLR_Slide;
+}
+
+addr_t Find_kernel_memory_allocate() {
+    uint64_t ref = Find_strref("\"kernel_memory_allocate: VM is not ready\"", 1, 0, true);
+    if (!ref) {
+        return 0;
+    }
+    ref -= KernDumpBase;
+    
+    uint64_t func = BOF64(Kernel, XNUCore_Base, ref);
+    if (!func) {
+        return 0;
+    }
+    
+    return func + KernDumpBase + KASLR_Slide;
+}
+
+addr_t Find_kernel_map() {
+    uint64_t kalloc_canblock = Find_kalloc_canblock();
+    if (!kalloc_canblock) {
+        return 0;
+    }
+    kalloc_canblock -= (KernDumpBase + KASLR_Slide);
+    
+    uint64_t kern_alloc = Find_kernel_memory_allocate();
+    if (!kern_alloc) {
+        return 0;
+    }
+    kern_alloc -= (KernDumpBase + KASLR_Slide);
+    
+    uint64_t val = 0;
+    uint64_t func = kalloc_canblock;
+    
+    for (int i = 0; i < 5; i++) {
+        func = Step64(Kernel, func + 4, 4*80, INSN_CALL);
+        
+        if (Follow_call64(Kernel, func) == kern_alloc) {
+            val = Calc64(Kernel, kalloc_canblock, func, 10);
+            break;
+        }
+    }
+    
+    if (!val) {
+        return 0;
+    }
+    
+    return val + KernDumpBase + KASLR_Slide;
 }

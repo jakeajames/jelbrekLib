@@ -27,6 +27,8 @@ uint64_t Find_kalloc_canblock(void);
 uint64_t Find_cs_blob_allocate_site(void);
 uint64_t Find_kfree(void);
 uint64_t Find_cs_find_md(void);
+uint64_t Find_kernel_memory_allocate(void);
+uint64_t Find_kernel_map(void);
 
 // PAC
 uint64_t Find_l2tp_domain_module_start(void);

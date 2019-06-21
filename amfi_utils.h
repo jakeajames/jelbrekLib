@@ -11,6 +11,7 @@ void getSHA256inplace(const uint8_t* code_dir, uint8_t *out);
 uint8_t *getSHA256(const uint8_t* code_dir);
 uint8_t *getCodeDirectory(const char* name);
 uint64_t ubc_cs_blob_allocate(vm_size_t size);
+void kern_free(uint64_t addr, vm_size_t size);
 int cs_validate_csblob(const uint8_t *addr, size_t length, CS_CodeDirectory **rcd, CS_GenericBlob **rentitlements);
 uint64_t getCodeSignatureLC(FILE *file, int64_t *machOff);
 const struct cs_hash *cs_find_md(uint8_t type);

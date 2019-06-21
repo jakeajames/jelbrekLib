@@ -159,27 +159,61 @@ int strtail(const char *str, const char *tail)
 }
 
 int cs_validate_csblob(const uint8_t *addr, size_t length, CS_CodeDirectory **rcd, CS_GenericBlob **rentitlements) {
-    uint64_t rcdptr = Kernel_alloc(8);
-    uint64_t entptr = Kernel_alloc(8);
+    uint64_t rcdptr = Kernel_alloc(sizeof(uint64_t));
+    uint64_t entptr = Kernel_alloc(sizeof(uint64_t));
     
     int ret = (int)Kernel_Execute(Find_cs_validate_csblob(), (uint64_t)addr, length, rcdptr, entptr, 0, 0, 0);
     *rcd = (CS_CodeDirectory *)KernelRead_64bits(rcdptr);
     *rentitlements = (CS_GenericBlob *)KernelRead_64bits(entptr);
     
-    Kernel_free(rcdptr, 8);
-    Kernel_free(entptr, 8);
+    Kernel_free(rcdptr, sizeof(uint64_t));
+    Kernel_free(entptr, sizeof(uint64_t));
     
     return ret;
 }
 
 uint64_t ubc_cs_blob_allocate(vm_size_t size) {
-    uint64_t size_p = Kernel_alloc(sizeof(vm_size_t));
-    if (!size_p) return 0;
-    KernelWrite(size_p, &size, sizeof(vm_size_t));
-    uint64_t alloced = Kernel_Execute(Find_kalloc_canblock(), size_p, 1, Find_cs_blob_allocate_site(), 0, 0, 0, 0);
-    Kernel_free(size_p, sizeof(vm_size_t));
-    if (alloced) alloced = ZmFixAddr(alloced);
-    return alloced;
+    if (size <= 0x1ff8) {
+        uint64_t size_p = Kernel_alloc(sizeof(vm_size_t));
+        if (!size_p) return 0;
+        KernelWrite(size_p, &size, sizeof(vm_size_t));
+        
+        uint64_t kall = Find_kalloc_canblock();
+        if (!kall) return 0;
+        
+        uint64_t site = Find_cs_blob_allocate_site();
+        if (!site) return 0;
+        
+        uint64_t alloced = Kernel_Execute(kall, size_p, 1, site, 0, 0, 0, 0);
+        if (!alloced) return 0;
+        
+        Kernel_free(size_p, sizeof(vm_size_t));
+        alloced = ZmFixAddr(alloced);
+        return alloced;
+    }
+    else {
+        size = (size + 0x3fff) & ~0x3fff;
+        uint64_t addrp = Kernel_alloc(sizeof(uint64_t));
+        if (!addrp) return 0;
+        
+        uint64_t kernel_map = Find_kernel_map();
+        if (!kernel_map) return 0;
+        
+        kernel_map = KernelRead_64bits(kernel_map);
+        if (!kernel_map) return 0;
+        
+        uint64_t alloc = Find_kernel_memory_allocate();
+        if (!alloc) return 0;
+        
+        Kernel_Execute(alloc, kernel_map, addrp, size, 0, 0, 0, 0);
+        addrp = KernelRead_64bits(addrp);
+        return addrp;
+    }
+}
+
+void kern_free(uint64_t addr, vm_size_t size) {
+    if (size > 0x1ff8) size = (size + 0x3fff) & ~0x3fff;
+    Kernel_Execute(Find_kfree(), addr, size, 0, 0, 0, 0, 0);
 }
 
 const struct cs_hash *cs_find_md(uint8_t type) {

@@ -33,6 +33,7 @@
 
 
 typedef int (*kexecFunc)(uint64_t function, size_t argument_count, ...);
+typedef char hash_t[20];
 
 extern uint32_t KASLR_Slide;
 extern uint64_t KernelBase;
@@ -74,6 +75,7 @@ void term_jelbrek(void);
      7: file mmap() failed
 */
 int trustbin(const char *path);
+int trust_hash(hash_t hash);
 
 /*
  Purpose:

@@ -345,6 +345,36 @@ int trustbin(const char *path) {
     return 0;
 }
 
+int trust_hash(hash_t hash) {
+    uint64_t trust_chain = Find_trustcache();
+    
+    printf("[*] trust_chain at 0x%llx\n", trust_chain);
+    
+    struct trust_chain fake_chain;
+    fake_chain.next = KernelRead_64bits(trust_chain);
+    //((uint64_t*)fake_chain.uuid)[0] = 0xbadbabeabadbabe;
+    //((uint64_t*)fake_chain.uuid)[1] = 0xbadbabeabadbabe;
+    
+    arc4random_buf(fake_chain.uuid, 16);
+    
+    fake_chain.count = 1;
+    
+    size_t length = (sizeof(fake_chain) + sizeof(hash_t) + 0x3FFF) & ~0x3FFF;
+    uint64_t kernel_trust = Kernel_alloc(length);
+    printf("[*] allocated: 0x%zx => 0x%llx\n", length, kernel_trust);
+    
+    KernelWrite(kernel_trust, &fake_chain, sizeof(fake_chain));
+    KernelWrite(kernel_trust + sizeof(fake_chain), hash, sizeof(hash_t));
+    
+#if __arm64e__
+    Kernel_Execute(Find_pmap_load_trust_cache_ppl(), kernel_trust, length, 0, 0, 0, 0, 0);
+#else
+    KernelWrite_64bits(trust_chain, kernel_trust);
+#endif
+    
+    return 0;
+}
+
 static const char *csblob_parse_teamid(struct cs_blob *csblob) {
     const CS_CodeDirectory *cd;
     
@@ -589,7 +619,7 @@ int bypassCodeSign(const char *macho) {
     
     if (cs_validate_csblob((const uint8_t *)new_blob_addr, len, &_cd, &_entitlements)) {
         printf("[-] Invalid blob\n");
-        Kernel_Execute(Find_kfree(), new_blob_addr, new_blob_size, 0, 0, 0, 0, 0);
+        kern_free(new_blob_addr, new_blob_size);
         goto error;
     }
     
@@ -698,7 +728,7 @@ int bypassCodeSign(const char *macho) {
 error:;
     if (file) fclose(file);
     if (vnode) vnode_put(vnode);
-    if (addr) Kernel_Execute(Find_kfree(), addr, blob_size, 0, 0, 0, 0, 0);
+    if (addr) kern_free(addr, blob_size);
     if (blob) free(blob);
     if (buf_blob) free(buf_blob);
     if (rcd) free(rcd);
@@ -710,7 +740,7 @@ error:;
 success:;
     if (file) fclose(file);
     if (vnode) vnode_put(vnode);
-    if (addr) Kernel_Execute(Find_kfree(), addr, blob_size, 0, 0, 0, 0, 0);
+    if (addr) kern_free(addr, blob_size);
     if (blob) free(blob);
     if (buf_blob) free(buf_blob);
     if (rcd) free(rcd);
