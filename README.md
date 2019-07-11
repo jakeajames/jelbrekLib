@@ -5,13 +5,13 @@ Library with commonly used patches in open-source jailbreaks. Call this a (light
 
 # Compiling:
 
-    ./make.sh
-    
+./make.sh
+
 # Setup
 
-- Compile OR head over to https://github.com/jakeajames/jelbrekLib/tree/master/downloads and get everything there. 
-- Link with jelbrekLib.a & IOKit.tbd and include jelbrekLib.h
-- Call init_jelbrek() with tfp0 as your first thing and term_jelbrek() as your last
+- Compile OR head over to https://github.com/jakeajames/jelbrekLib/tree/master/downloads and get everything there.
+- Link with jelbrekLib.dylib and include jelbrekLib.h
+- Call init_jelbrek() with tfp0, as your first thing and term_jelbrek(), as your last
 
 # Issues
 - AMFID patch won't resist after app enters background. Fix would be using a daemon (like amfidebilitate) or injecting a dylib (iOS 11)
@@ -37,3 +37,4 @@ Library with commonly used patches in open-source jailbreaks. Call this a (light
 - The rest of patches are fairly simple and shouldn't be considered property of anyone in my opinion. Everyone who has enough knowledge can write them fairly easily
 
 And, don't forget to tell me if I forgot to credit anyone!
+

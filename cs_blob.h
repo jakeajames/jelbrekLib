@@ -206,6 +206,11 @@ struct cs_blob {
     /* The following two will be replaced by the csb_signer_type. */
     unsigned int    csb_platform_binary:1;
     unsigned int    csb_platform_path:1;
+    
+#if __arm64e__
+    uint64_t csb_pmap_cs_entry;
+#endif
+    
 };
 
 typedef void (*cs_md_init)(void *ctx);

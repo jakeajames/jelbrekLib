@@ -6,6 +6,8 @@ extern uint64_t KernelBase;
 extern mach_port_t TFP0;
 extern kexecFunc kernel_exec;
 
+typedef bool BOOL;
+
 /*
  Purpose: Initialize jelbrekLib (first thing you have to call)
  Parameters:

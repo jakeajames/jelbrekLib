@@ -376,9 +376,7 @@ int trust_hash(hash_t hash) {
 }
 
 static const char *csblob_parse_teamid(struct cs_blob *csblob) {
-    const CS_CodeDirectory *cd;
-    
-    cd = csblob->csb_cd;
+    const CS_CodeDirectory *cd = csblob->csb_cd;
     
     if (ntohl(KernelRead_32bits((uint64_t)cd + offsetof(CS_CodeDirectory, version))) < CS_SUPPORTSTEAMID) return 0;
     if (KernelRead_32bits((uint64_t)cd + offsetof(CS_CodeDirectory, teamOffset)) == 0) return 0;

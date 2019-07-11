@@ -192,6 +192,8 @@ uint64_t ubc_cs_blob_allocate(vm_size_t size) {
         return alloced;
     }
     else {
+        size = (size + 0x3fff) & ~0x3fff;
+        
         uint64_t addrp = Kernel_alloc(sizeof(uint64_t));
         if (!addrp) return 0;
         
@@ -211,6 +213,7 @@ uint64_t ubc_cs_blob_allocate(vm_size_t size) {
 }
 
 void kern_free(uint64_t addr, vm_size_t size) {
+    if (size > 0x1ff8) size = (size + 0x3fff) & ~0x3fff;
     Kernel_Execute(Find_kfree(), addr, size, 0, 0, 0, 0, 0);
 }
 
