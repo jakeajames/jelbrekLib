@@ -3,3 +3,4 @@
 
 uint64_t FindKernelBase(void);
 uint64_t binary_load_address(mach_port_t tp);
+uint64_t dataForFD(int fd, int pid);

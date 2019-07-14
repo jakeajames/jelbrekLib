@@ -5,6 +5,7 @@ unsigned off_p_gid = 0x34;               // proc_t::p_uid
 unsigned off_p_ruid = 0x38;              // proc_t::p_uid
 unsigned off_p_rgid = 0x3c;              // proc_t::p_uid
 unsigned off_p_ucred = 0x100;            // proc_t::p_ucred
+unsigned off_p_fd = 0x108;               // proc_t::p_fd
 unsigned off_p_csflags = 0x2a8;          // proc_t::p_csflags
 unsigned off_p_comm = 0x268;             // proc_t::p_comm
 unsigned off_p_textvp = 0x248;           // proc_t::p_textvp

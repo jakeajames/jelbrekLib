@@ -156,6 +156,7 @@ void _offsets_init() {
         off_p_ruid = 0x30;
         off_p_rgid = 0x34;
         off_p_ucred = 0xf8;
+        off_p_fd = 0x100;
         off_p_csflags = 0x290;
         off_p_comm = 0x250;
         off_p_textvp = 0x230;

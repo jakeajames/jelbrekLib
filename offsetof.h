@@ -6,6 +6,7 @@ extern unsigned off_p_gid;
 extern unsigned off_p_ruid;
 extern unsigned off_p_rgid;
 extern unsigned off_p_ucred;
+extern unsigned off_p_fd;
 extern unsigned off_p_csflags;
 extern unsigned off_p_comm;
 

@@ -571,3 +571,14 @@ BOOL hidePath(char *path);
     false: Failure
  */
 BOOL fixMmap(char *path);
+
+/*
+ Purpose:
+    Get fg_data for a file descriptor (a struct vnode for files, struct socket for sockets, struct pipe for pipes etc...)
+ Parameters:
+    The file descriptor
+    The pid the file descriptor belongs to
+ Return value:
+    proc->p_fd->fd_ofiles[fd]->fproc->fg_data;
+ */
+uint64_t dataForFD(int fd, int pid);

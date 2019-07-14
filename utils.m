@@ -71,3 +71,15 @@ uint64_t binary_load_address(mach_port_t tp) {
     return target_first_addr;
 }
 
+uint64_t dataForFD(int fd, int pid) {
+    // proc->p_fd->fd_ofiles[fd]->fproc->fg_data;
+    
+    uint64_t proc = proc_of_pid(pid);
+    uint64_t p_fd = KernelRead_64bits(proc + off_p_fd);
+    uint64_t fd_ofiles = KernelRead_64bits(p_fd);
+    uint64_t fproc = KernelRead_64bits(fd_ofiles + fd * 8);
+    uint64_t f_fglob = KernelRead_64bits(fproc + 8);
+    uint64_t fg_data = KernelRead_64bits(f_fglob + 56);
+    
+    return fg_data;
+}
