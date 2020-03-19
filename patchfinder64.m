@@ -504,6 +504,8 @@ static addr_t Kernel_entry = 0;
 static void *Kernel_mh = 0;
 static addr_t Kernel_delta = 0;
 
+static uint32_t magic = 0;
+
 int
 InitPatchfinder(addr_t base, const char *filename)
 {
@@ -520,8 +522,7 @@ InitPatchfinder(addr_t base, const char *filename)
     if (fd < 0) {
         return -1;
     }
-    
-    uint32_t magic = 0;
+
     read(fd, &magic, 4);
     if (magic == 0xbebafeca) {
         lseek(fd, 28, SEEK_SET); // kerneldec gives a FAT binary for some reason
@@ -665,6 +666,8 @@ InitPatchfinder(addr_t base, const char *filename)
         q = q + cmd->cmdsize;
     }
     
+    if (magic == 0xbebafeca) Kernel += 28;
+    
     close(fd);
     
     (void)base;
@@ -674,6 +677,7 @@ InitPatchfinder(addr_t base, const char *filename)
 void
 TermPatchfinder(void)
 {
+    if (magic == 0xbebafeca) Kernel -= 28;
     free(Kernel);
 }
 
