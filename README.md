@@ -11,7 +11,7 @@ Library with commonly used patches in open-source jailbreaks. Call this a (light
 
 - Compile OR head over to https://github.com/jakeajames/jelbrekLib/tree/master/downloads and get everything there.
 - Link with jelbrekLib.dylib and include jelbrekLib.h
-- Call init_jelbrek() with tfp0, as your first thing and term_jelbrek(), as your last
+- Call init_with_kbase() with tfp0, the kernel base and (optionally, leave NULL otherwise) a custom kernel execution function, as your first thing and term_jelbrek(), as your last
 
 # Issues
 - AMFID patch won't resist after app enters background. Fix would be using a daemon (like amfidebilitate) or injecting a dylib (iOS 11)
@@ -35,6 +35,7 @@ Library with commonly used patches in open-source jailbreaks. Call this a (light
 - CSBlob patching with stuff from Jonathan Levin and xerub
 - Symbol finding (https://github.com/jakeajames/kernelSymbolFinder) & the CoreTrust bypass technique by me ;)
 - The rest of patches are fairly simple and shouldn't be considered property of anyone in my opinion. Everyone who has enough knowledge can write them fairly easily
+- sbingner for kerneldec
 
 And, don't forget to tell me if I forgot to credit anyone!
 
