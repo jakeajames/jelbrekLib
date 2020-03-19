@@ -41,7 +41,6 @@ int Kernel_strcmp(uint64_t kstr, const char* str) {
 }
 
 uint64_t TaskSelfAddr() {
-    
     uint64_t selfproc = proc_of_pid(getpid());
     if (selfproc == 0) {
         fprintf(stderr, "[-] failed to find our task addr\n");

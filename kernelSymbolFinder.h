@@ -6,8 +6,6 @@
 //  Copyright © 2018 Jake James. All rights reserved.
 //
 
-#import "lzssdec.hpp"
-
 #import <unistd.h>
 #import <stdio.h>
 #import <stdlib.h>

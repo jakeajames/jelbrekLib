@@ -20,16 +20,6 @@ static void *load_bytes(FILE *obj_file, off_t offset, uint32_t size) {
     return buf;
 }
 
-uint32_t find_macho_header() {
-    uint32_t off = 0;
-    uint32_t *magic = load_bytes(file, off, sizeof(uint32_t));
-    while ((*magic & ~1) != 0xFEEDFACE) {
-        off++;
-        magic = load_bytes(file, off, sizeof(uint32_t));
-    }
-    return off - 1;
-}
-
 uint64_t find_symbol(const char *symbol, bool verbose) {
     
     //----This will store symbol address----//
@@ -164,25 +154,25 @@ uint64_t find_symbol(const char *symbol, bool verbose) {
 }
 
 int initWithKernelCache(const char *kernelcache) {
-    file = fopen(kernelcache, "rb");
-    offset = find_macho_header();
-    if (!offset) {
-        printf("[-] offset = 0; this isn't a macho, right?\n");
+    size_t pathlen = strlen(kernelcache);
+    char decomp[pathlen + 5];
+    memcpy(decomp, kernelcache, pathlen);
+    memcpy(decomp + pathlen, ".dec", 5);
+    
+    extern int kerneldec(int argc, char**argv);
+    const char *args[6] = { "kerneldec", "-q", "-i", kernelcache, "-o", decomp };
+
+    int ret = kerneldec(6, (char **)args);
+    if (ret) {
+        printf("[-] Failed to decompress kernel\n");
         return -1;
     }
     
-    printf("[i] Mach-o header at 0x%X\n", offset);
-    
-    char strOff[128]; // I don't think a string of the offset can ever be bigger than 128 bytes
-    sprintf(strOff, "0x%X", offset);
-    char *args[5] = { strdup("lzssdec"), strdup("-o"), strdup(strOff), strdup(kernelcache), strcat(strdup(kernelcache), ".dec")};
-    
-    if (lzssdec(5, (char **)args)) {
-        printf("[-] Failed decompression, this is lzss right?\n");
+    file = fopen(decomp, "rb");
+    if (!file) {
+        printf("[-] Failed to open decompressed kernelcache\n");
         return -1;
     }
-    else printf("[+] Decompressed kernelcache!\n");
-    fclose(file);
-    file = fopen(strcat(strdup(kernelcache), ".dec"), "rb");
+    
     return 0;
 }
