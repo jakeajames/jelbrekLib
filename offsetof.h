@@ -61,6 +61,8 @@ extern unsigned off_specflags;
 extern unsigned off_mnt_flag;
 extern unsigned off_mnt_data;
 
+extern unsigned off_getExternelTrapForIndex;
+
 #define	CS_VALID		0x0000001	/* dynamically valid */
 #define CS_ADHOC		0x0000002	/* ad hoc signed */
 #define CS_GET_TASK_ALLOW	0x0000004	/* has get-task-allow entitlement */

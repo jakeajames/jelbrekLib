@@ -220,6 +220,8 @@ void _offsets_init() {
 #else
         off_t_flags = 0x3d0;
 #endif
+        
+        off_getExternelTrapForIndex = 0xb8;
     }
     else if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"12.0")) {
         printf("[i] offsets selected for iOS 12.0 or above\n");

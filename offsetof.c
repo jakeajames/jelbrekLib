@@ -61,3 +61,4 @@ unsigned off_specflags = 0x10;
 unsigned off_mnt_flag = 0x70;            // mount::mnt_flag
 unsigned off_mnt_data = 0x8f8;           // mount::mnt_data
 
+unsigned off_getExternelTrapForIndex = 0xb7; // IOUserClient::getExternalTrapForIndex
