@@ -176,8 +176,7 @@ size_t lzfse_decode_buffer(uint8_t *__restrict dst_buffer, size_t dst_size,
   return ret;
 } 
 
-size_t lzfse_decode_file(FILE *dst_file, FILE *src_file, size_t src_size,
-                         int *error, void *__restrict scratch_buffer) {
+size_t lzfse_decode_file(FILE *dst_file, FILE *src_file, size_t src_size, int *error, void *__restrict scratch_buffer) {
   int has_malloc = 0;
   size_t ret = 0;
 

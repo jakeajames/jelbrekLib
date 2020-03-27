@@ -67,7 +67,7 @@ int kerneldec(int argc,char**argv)
 		break;
 	    case 'o':
 		outfile = optarg;
-		if (output != stdin)
+		if (output != stdout)
 		    fclose(output);
 		output = fopen(outfile, "w");
 		break;
