@@ -526,6 +526,7 @@ InitPatchfinder(addr_t base, const char *filename)
 
     uint32_t magic;
     read(fd, &magic, 4);
+    lseek(fd, 0, SEEK_SET);
     if (magic == 0xbebafeca) {
         struct fat_header fat;
         lseek(fd, sizeof(fat), SEEK_SET);
